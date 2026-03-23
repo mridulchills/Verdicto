@@ -17,7 +17,7 @@ const LegalTerm = ({ term, definition }) => (
     `}</style>
   </span>
 );
-
+//Making changes in ResultsDashboard.jsx
 const ResultsDashboard = () => {
   const [activeTab, setActiveTab] = useState('summary');
   const [expandedId, setExpandedId] = useState(null);
@@ -37,13 +37,13 @@ const ResultsDashboard = () => {
   ];
 
   const precedentData = [
-    { 
-      id: 1, 
-      title: "In Re: Interplay Between Arbitration Agreements", 
-      court: "Supreme Court (7-Judge)", year: 2023, score: "81.4%", 
+    {
+      id: 1,
+      title: "In Re: Interplay Between Arbitration Agreements",
+      court: "Supreme Court (7-Judge)", year: 2023, score: "81.4%",
       jurisdiction: "Supreme Court of India",
       judges: "D.Y. Chandrachud, S.K. Kaul, Sanjiv Khanna, B.R. Gavai, Surya Kant, J.B. Pardiwala, Manoj Misra",
-      outcome: "Arbitration Valid", relief: "Section 11 motion granted. Arbitral Tribunal can be constituted.", stars: 5, 
+      outcome: "Arbitration Valid", relief: "Section 11 motion granted. Arbitral Tribunal can be constituted.", stars: 5,
       strength: "Binding", recommendation: "Highly Applicable Precedent",
       ratioDecidendi: "Non-stamping or insufficient stamping of an underlying contract is merely a curable defect under the Stamp Act. It does not render the arbitration agreement void ab initio. Under the doctrine of Kompetenz-Kompetenz, the arbitral tribunal, not the Section 11 referral court, must adjudicate the document's validity.",
       obiterDicta: "The Stamp Act is a fiscal statute intent on protecting revenue, not a tool to arm a litigating party with weapons of technicality to defeat the arbitration process.",
@@ -69,12 +69,12 @@ const ResultsDashboard = () => {
       cites: ["Vidya Drolia (2020)", "SMS Tea Estates (Overruled)"],
       citedBy: 142,
       desc: "Curative petition reversing NN Global. Held that non-stamping of an underlying contract is a curable defect and does not render the arbitration agreement void.",
-      metrics: [98, 92, 100, 95] 
+      metrics: [98, 92, 100, 95]
     },
-    { 
-      id: 2, 
-      title: "NN Global Mercantile Pvt. Ltd. v. Indo Unique Flame", 
-      court: "Supreme Court (5-Judge)", year: 2023, score: "68.2%", 
+    {
+      id: 2,
+      title: "NN Global Mercantile Pvt. Ltd. v. Indo Unique Flame",
+      court: "Supreme Court (5-Judge)", year: 2023, score: "68.2%",
       jurisdiction: "Supreme Court of India",
       judges: "K.M. Joseph, Ajay Rastogi, Aniruddha Bose, Hrishikesh Roy, C.T. Ravikumar",
       outcome: "Arbitration Invalid", relief: "Section 11 application dismissed pending stamp duty payment.", stars: 4, challenged: true,
@@ -102,12 +102,12 @@ const ResultsDashboard = () => {
       cites: ["Garware Wall Ropes (2019)", "SMS Tea Estates (2011)"],
       citedBy: 86,
       desc: "Overruled by In Re: Interplay. Previously held that an unstamped instrument containing an arbitration agreement cannot be acted upon by the Court.",
-      metrics: [95, 80, 85, 40] 
+      metrics: [95, 80, 85, 40]
     },
-    { 
-      id: 3, 
-      title: "Garware Wall Ropes Ltd. v. Coastal Marine", 
-      court: "Supreme Court", year: 2019, score: "54.7%", 
+    {
+      id: 3,
+      title: "Garware Wall Ropes Ltd. v. Coastal Marine",
+      court: "Supreme Court", year: 2019, score: "54.7%",
       jurisdiction: "Supreme Court of India",
       judges: "R.F. Nariman, Vineet Saran",
       outcome: "Arbitration Invalid", relief: "Contract impounded; arbitration paused.", stars: 3,
@@ -134,12 +134,12 @@ const ResultsDashboard = () => {
       cites: ["SMS Tea Estates (2011)"],
       citedBy: 112,
       desc: "Affirmed the position that an arbitration clause in an unstamped commercial agreement cannot be invoked until duty is paid.",
-      metrics: [85, 75, 80, 50] 
+      metrics: [85, 75, 80, 50]
     },
-    { 
-      id: 4, 
-      title: "SMS Tea Estates Pvt. Ltd. v. Chandmari Tea", 
-      court: "Supreme Court", year: 2011, score: "49.1%", 
+    {
+      id: 4,
+      title: "SMS Tea Estates Pvt. Ltd. v. Chandmari Tea",
+      court: "Supreme Court", year: 2011, score: "49.1%",
       jurisdiction: "Supreme Court of India",
       judges: "R.V. Raveendran, A.K. Patnaik",
       outcome: "Arbitration Invalid", relief: "Lease deed impounded.", stars: 3,
@@ -167,12 +167,12 @@ const ResultsDashboard = () => {
       cites: [],
       citedBy: 245,
       desc: "The genesis of the strict interpretation regarding unstamped documents.",
-      metrics: [70, 80, 90, 45] 
+      metrics: [70, 80, 90, 45]
     },
-    { 
-      id: 5, 
-      title: "M/s Weatherford Oil Tool v. Tesac", 
-      court: "Supreme Court", year: 2020, score: "32.6%", 
+    {
+      id: 5,
+      title: "M/s Weatherford Oil Tool v. Tesac",
+      court: "Supreme Court", year: 2020, score: "32.6%",
       jurisdiction: "Supreme Court of India",
       judges: "Indu Malhotra, Ajay Rastogi",
       outcome: "Distinguished", relief: "Arbitrator appointed conditionally.", stars: 2,
@@ -199,7 +199,7 @@ const ResultsDashboard = () => {
       cites: ["Garware Wall Ropes (2019)"],
       citedBy: 45,
       desc: "Dealt with insufficient stamping where reliance could be placed subject to conditional impounding.",
-      metrics: [65, 60, 75, 60] 
+      metrics: [65, 60, 75, 60]
     }
   ];
 
@@ -227,27 +227,27 @@ const ResultsDashboard = () => {
   useEffect(() => {
     if (activeTab === 'graph' && graphRef.current) {
       setTimeout(() => {
-         graphRef.current.zoomToFit(400, 50);
+        graphRef.current.zoomToFit(400, 50);
       }, 500);
     }
   }, [activeTab]);
 
   const handleExpand = (id, e) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     if (challengeOpen === id) return;
     setExpandedId(id);
   };
-  
+
   const expandedCase = precedentData.find(p => p.id === expandedId);
 
   return (
     <div style={{ display: 'flex', gap: '2rem', height: '100%', position: 'relative' }}>
-      
+
       {/* Full Screen Precedent Modal */}
       {expandedCase && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(11, 19, 38, 0.95)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div className="insight-card" style={{ width: '95vw', height: '95vh', backgroundColor: 'var(--surface-container-high)', border: '1px solid var(--outline-variant-ghost)', padding: '0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-            
+
             {/* Modal Header — Section A: Case Metadata */}
             <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid var(--surface-container)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--surface-container-lowest)' }}>
               <div>
@@ -258,12 +258,12 @@ const ResultsDashboard = () => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                  <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '6px' }}><Scale size={14}/> {expandedCase.jurisdiction} ({expandedCase.year})</span>
-                  <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={14}/> {expandedCase.judges}</span>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '6px' }}><Scale size={14} /> {expandedCase.jurisdiction} ({expandedCase.year})</span>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={14} /> {expandedCase.judges}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                     {[...Array(5)].map((_, idx) => (
-                       <Star key={idx} size={14} fill={idx < expandedCase.stars ? "var(--secondary)" : "transparent"} stroke={idx < expandedCase.stars ? "var(--secondary)" : "var(--on-surface-variant)"} />
-                     ))}
+                    {[...Array(5)].map((_, idx) => (
+                      <Star key={idx} size={14} fill={idx < expandedCase.stars ? "var(--secondary)" : "transparent"} stroke={idx < expandedCase.stars ? "var(--secondary)" : "var(--on-surface-variant)"} />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -279,245 +279,245 @@ const ResultsDashboard = () => {
                 </button>
               </div>
             </div>
-            
+
             {/* Modal Body — Multi-Column Layout */}
             <div style={{ padding: '2rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-              
+
               {/* Row 1: Ratio Decidendi (D), Outcome (E), Strength (G), Citation Graph Info (H) */}
               <div style={{ display: 'flex', gap: '2rem' }}>
-                 
-                 <div style={{ flex: '1.5', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <div style={{ background: 'var(--primary-container)', padding: '1.5rem', borderRadius: '8px', borderLeft: '4px solid var(--primary)' }}>
-                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: 'var(--primary)', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
-                         <BookOpen size={18}/> 
-                         <LegalTerm term="RATIO DECIDENDI" definition="The core legal reasoning behind the judgment. The principle that forms the precedent." /> 
-                         (CORE REASONING)
-                       </span>
-                       <p className="newsreader" style={{ fontSize: '1.125rem', color: 'var(--on-surface)', lineHeight: 1.8 }}>
-                         "{expandedCase.ratioDecidendi}"
-                       </p>
+
+                <div style={{ flex: '1.5', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div style={{ background: 'var(--primary-container)', padding: '1.5rem', borderRadius: '8px', borderLeft: '4px solid var(--primary)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: 'var(--primary)', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
+                      <BookOpen size={18} />
+                      <LegalTerm term="RATIO DECIDENDI" definition="The core legal reasoning behind the judgment. The principle that forms the precedent." />
+                      (CORE REASONING)
+                    </span>
+                    <p className="newsreader" style={{ fontSize: '1.125rem', color: 'var(--on-surface)', lineHeight: 1.8 }}>
+                      "{expandedCase.ratioDecidendi}"
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1.5rem' }}>
+                    <div style={{ flex: 1, background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, letterSpacing: '0.05em' }}>FINAL OUTCOME / RELIEF GRANTED</span>
+                      <span style={{ fontSize: '1rem', color: 'var(--on-surface)', fontWeight: 600 }}>{expandedCase.relief}</span>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1.5rem' }}>
-                       <div style={{ flex: 1, background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, letterSpacing: '0.05em' }}>FINAL OUTCOME / RELIEF GRANTED</span>
-                         <span style={{ fontSize: '1rem', color: 'var(--on-surface)', fontWeight: 600 }}>{expandedCase.relief}</span>
-                       </div>
+                    <div style={{ flex: 1, background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, letterSpacing: '0.05em' }}>
+                        <LegalTerm term="OBITER DICTA" definition="Extra comments by the judge. Not binding, but can be persuasive in arguments." /> (OPTIONAL)
+                      </span>
+                      <span style={{ fontSize: '0.875rem', color: 'var(--on-surface)' }}>"{expandedCase.obiterDicta}"</span>
+                    </div>
+                  </div>
+                </div>
 
-                       <div style={{ flex: 1, background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, letterSpacing: '0.05em' }}>
-                            <LegalTerm term="OBITER DICTA" definition="Extra comments by the judge. Not binding, but can be persuasive in arguments." /> (OPTIONAL)
-                         </span>
-                         <span style={{ fontSize: '0.875rem', color: 'var(--on-surface)' }}>"{expandedCase.obiterDicta}"</span>
-                       </div>
+                {/* Precedential Stats and Recommendation Mini-Dash */}
+                <div style={{ flex: '0.7', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px', borderTop: `4px solid ${expandedCase.strength === 'Binding' ? '#4ade80' : 'var(--agent-similarity)'}` }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>PRECEDENTIAL STRENGTH</div>
+                    <div style={{ fontSize: '1.25rem', color: 'var(--on-surface)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {expandedCase.strength}
+                      <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--on-surface-variant)' }}>
+                        (<LegalTerm term={expandedCase.strength === 'Binding' ? 'Binding' : 'Persuasive'} definition={expandedCase.strength === 'Binding' ? 'Must be followed by lower courts.' : 'Optional to follow, based on authority.'} />)
+                      </span>
                     </div>
-                 </div>
+                  </div>
 
-                 {/* Precedential Stats and Recommendation Mini-Dash */}
-                 <div style={{ flex: '0.7', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px', borderTop: `4px solid ${expandedCase.strength === 'Binding' ? '#4ade80' : 'var(--agent-similarity)'}` }}>
-                       <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>PRECEDENTIAL STRENGTH</div>
-                       <div style={{ fontSize: '1.25rem', color: 'var(--on-surface)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                         {expandedCase.strength}
-                         <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--on-surface-variant)' }}>
-                           (<LegalTerm term={expandedCase.strength === 'Binding' ? 'Binding' : 'Persuasive'} definition={expandedCase.strength === 'Binding' ? 'Must be followed by lower courts.' : 'Optional to follow, based on authority.'} />)
-                         </span>
-                       </div>
+                  <div style={{ background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>CITATION GRAPH STATS</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--on-surface)' }}>Cited By (Impact):</span>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>{expandedCase.citedBy} Cases</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--on-surface)' }}>Key Cases Cited:</span>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)' }}>{expandedCase.cites.join(', ') || 'None prominent'}</span>
+                      </div>
                     </div>
-                    
-                    <div style={{ background: 'var(--surface-container)', padding: '1.25rem', borderRadius: '8px' }}>
-                       <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>CITATION GRAPH STATS</div>
-                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                           <span style={{ fontSize: '0.875rem', color: 'var(--on-surface)' }}>Cited By (Impact):</span>
-                           <span style={{ fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>{expandedCase.citedBy} Cases</span>
-                         </div>
-                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                           <span style={{ fontSize: '0.875rem', color: 'var(--on-surface)' }}>Key Cases Cited:</span>
-                           <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)' }}>{expandedCase.cites.join(', ') || 'None prominent'}</span>
-                         </div>
-                       </div>
-                    </div>
+                  </div>
 
-                    <div style={{ background: 'var(--surface-container-low)', padding: '1.25rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                       <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, marginBottom: '0.5rem' }}>AGENT RECOMMENDATION</span>
-                       <span style={{ background: 'var(--secondary)', color: 'var(--surface)', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: 700, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Layers size={16}/> {expandedCase.recommendation}
-                       </span>
-                    </div>
-                 </div>
+                  <div style={{ background: 'var(--surface-container-low)', padding: '1.25rem', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, marginBottom: '0.5rem' }}>AGENT RECOMMENDATION</span>
+                    <span style={{ background: 'var(--secondary)', color: 'var(--surface)', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: 700, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Layers size={16} /> {expandedCase.recommendation}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Row 2: Facts & Issues Comparison (B & C) */}
               <div style={{ display: 'flex', gap: '2rem' }}>
-                 
-                 {/* Section B: Facts Differential */}
-                 <div style={{ flex: 1, background: 'var(--surface-container)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                   <div style={{ padding: '1rem 1.5rem', background: 'var(--surface-container-low)', borderBottom: '1px solid var(--surface-container-lowest)', fontSize: '0.875rem', fontWeight: 700, color: 'var(--on-surface)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     <FileText size={16} color="var(--primary)" /> 
-                     <LegalTerm term="FACTS" definition="Actual events of the case (Who did what, when, how). Law is applied based on facts." /> ALIGNMENT
-                   </div>
-                   
-                   {/* Facts Breakdown */}
-                   <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem', borderBottom: '1px solid var(--surface-container-high)' }}>
-                      <div style={{ flex: 1, paddingRight: '1rem', borderRight: '1px solid var(--surface-container-high)' }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>KEY FACTS (INPUT CASE)</span>
-                         <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
-                           {inputCaseFacts.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
-                         </ul>
+
+                {/* Section B: Facts Differential */}
+                <div style={{ flex: 1, background: 'var(--surface-container)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '1rem 1.5rem', background: 'var(--surface-container-low)', borderBottom: '1px solid var(--surface-container-lowest)', fontSize: '0.875rem', fontWeight: 700, color: 'var(--on-surface)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={16} color="var(--primary)" />
+                    <LegalTerm term="FACTS" definition="Actual events of the case (Who did what, when, how). Law is applied based on facts." /> ALIGNMENT
+                  </div>
+
+                  {/* Facts Breakdown */}
+                  <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem', borderBottom: '1px solid var(--surface-container-high)' }}>
+                    <div style={{ flex: 1, paddingRight: '1rem', borderRight: '1px solid var(--surface-container-high)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>KEY FACTS (INPUT CASE)</span>
+                      <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                        {inputCaseFacts.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
+                      </ul>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>KEY FACTS (PRECEDENT)</span>
+                      <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                        {expandedCase.precedentFacts.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle2 size={14} /> MATCHING FACTS
+                      </span>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                        {expandedCase.factsComparison.matching.map((f, i) => <li key={i}>{f}</li>)}
+                      </ul>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--agent-similarity)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <AlertTriangle size={14} /> MISSING FACTS
+                        </span>
+                        <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface-variant)', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                          {expandedCase.factsComparison.missing.length > 0 ? expandedCase.factsComparison.missing.map((f, i) => <li key={i}>{f}</li>) : <li>None</li>}
+                        </ul>
                       </div>
                       <div style={{ flex: 1 }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>KEY FACTS (PRECEDENT)</span>
-                         <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
-                           {expandedCase.precedentFacts.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
-                         </ul>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--error)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <XCircle size={14} /> CONTRADICTING FACTS
+                        </span>
+                        <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface-variant)', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                          {expandedCase.factsComparison.contradicting.length > 0 ? expandedCase.factsComparison.contradicting.map((f, i) => <li key={i}>{f}</li>) : <li>None</li>}
+                        </ul>
                       </div>
-                   </div>
-
-                   <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
-                     <div>
-                       <span style={{ fontSize: '0.75rem', color: '#4ade80', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                         <CheckCircle2 size={14} /> MATCHING FACTS
-                       </span>
-                       <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                         {expandedCase.factsComparison.matching.map((f, i) => <li key={i}>{f}</li>)}
-                       </ul>
-                     </div>
-
-                     <div style={{ display: 'flex', gap: '1rem' }}>
-                       <div style={{ flex: 1 }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--agent-similarity)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                           <AlertTriangle size={14} /> MISSING FACTS
-                         </span>
-                         <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface-variant)', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                           {expandedCase.factsComparison.missing.length > 0 ? expandedCase.factsComparison.missing.map((f, i) => <li key={i}>{f}</li>) : <li>None</li>}
-                         </ul>
-                       </div>
-                       <div style={{ flex: 1 }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--error)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                           <XCircle size={14} /> CONTRADICTING FACTS
-                         </span>
-                         <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface-variant)', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                           {expandedCase.factsComparison.contradicting.length > 0 ? expandedCase.factsComparison.contradicting.map((f, i) => <li key={i}>{f}</li>) : <li>None</li>}
-                         </ul>
-                       </div>
-                     </div>
-                   </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Section C: Issues Differential */}
                 <div style={{ flex: 1, background: 'var(--surface-container)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                   <div style={{ padding: '1rem 1.5rem', background: 'var(--surface-container-low)', borderBottom: '1px solid var(--surface-container-lowest)', fontSize: '0.875rem', fontWeight: 700, color: 'var(--on-surface)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     <Hash size={16} color="var(--secondary)" /> 
-                     <LegalTerm term="ISSUES" definition="Legal questions the court must answer (e.g. Was contract valid?)." /> COMPARISON
-                   </div>
-                   
-                   <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem', borderBottom: '1px solid var(--surface-container-high)' }}>
-                      <div style={{ flex: 1, paddingRight: '1rem', borderRight: '1px solid var(--surface-container-high)' }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>LEGAL QUESTIONS (INPUT CASE)</span>
-                         <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
-                           {inputCaseIssues.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
-                         </ul>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                         <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>LEGAL QUESTIONS (PRECEDENT)</span>
-                         <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
-                           {expandedCase.precedentIssues.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
-                         </ul>
-                      </div>
-                   </div>
+                  <div style={{ padding: '1rem 1.5rem', background: 'var(--surface-container-low)', borderBottom: '1px solid var(--surface-container-lowest)', fontSize: '0.875rem', fontWeight: 700, color: 'var(--on-surface)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Hash size={16} color="var(--secondary)" />
+                    <LegalTerm term="ISSUES" definition="Legal questions the court must answer (e.g. Was contract valid?)." /> COMPARISON
+                  </div>
 
-                   <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
-                     <div>
-                       <span style={{ fontSize: '0.75rem', color: 'var(--secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                         <CheckCircle2 size={14} /> MATCHING ISSUES
-                       </span>
-                       <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                         {expandedCase.issuesComparison.matching.map((f, i) => <li key={i}>{f}</li>)}
-                       </ul>
-                     </div>
+                  <div style={{ padding: '1.5rem', display: 'flex', gap: '1rem', borderBottom: '1px solid var(--surface-container-high)' }}>
+                    <div style={{ flex: 1, paddingRight: '1rem', borderRight: '1px solid var(--surface-container-high)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>LEGAL QUESTIONS (INPUT CASE)</span>
+                      <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                        {inputCaseIssues.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
+                      </ul>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, display: 'block', marginBottom: '8px' }}>LEGAL QUESTIONS (PRECEDENT)</span>
+                      <ul style={{ margin: 0, paddingLeft: '1rem', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                        {expandedCase.precedentIssues.map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
+                      </ul>
+                    </div>
+                  </div>
 
-                     <div>
-                       <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                         <Hash size={14} /> ADDITIONAL ISSUES IN PRECEDENT
-                       </span>
-                       <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface-variant)', fontSize: '0.875rem', lineHeight: 1.6 }}>
-                         {expandedCase.issuesComparison.additional.length > 0 ? expandedCase.issuesComparison.additional.map((f, i) => <li key={i}>{f}</li>) : <li>None</li>}
-                       </ul>
-                     </div>
-                   </div>
+                  <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--secondary)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle2 size={14} /> MATCHING ISSUES
+                      </span>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface)', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                        {expandedCase.issuesComparison.matching.map((f, i) => <li key={i}>{f}</li>)}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Hash size={14} /> ADDITIONAL ISSUES IN PRECEDENT
+                      </span>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', gap: '0.5rem', display: 'flex', flexDirection: 'column', color: 'var(--on-surface-variant)', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                        {expandedCase.issuesComparison.additional.length > 0 ? expandedCase.issuesComparison.additional.map((f, i) => <li key={i}>{f}</li>) : <li>None</li>}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
 
               </div>
 
               {/* Row 3: Similarity Breakdown (F) and Differences/Vulnerability Warning (I) */}
               <div style={{ display: 'flex', gap: '2rem' }}>
-                 
-                 {/* Section F: Similarity Feature Matrix */}
-                 <div style={{ flex: '0.6', background: 'var(--surface-container)', padding: '2rem', borderRadius: '8px' }}>
-                   <div style={{ fontSize: '0.875rem', color: 'var(--tertiary)', fontWeight: 700, marginBottom: '2rem', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     <Target size={18}/> AI SIMILARITY BREAKDOWN
-                   </div>
-                   
-                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-                     {/* Radar */}
-                     <div style={{ width: '150px', height: '150px', marginBottom: '1rem' }}>
-                       <svg width="150" height="150" viewBox="0 0 100 100">
-                         <polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="var(--outline-variant-ghost)" />
-                         <polygon points="50,30 70,50 50,70 30,50" fill="none" stroke="var(--outline-variant-ghost)" />
-                         <line x1="50" y1="10" x2="50" y2="90" stroke="var(--outline-variant-ghost)"/>
-                         <line x1="10" y1="50" x2="90" y2="50" stroke="var(--outline-variant-ghost)"/>
-                         
-                         <text x="50" y="5" fontSize="4" fill="var(--on-surface-variant)" textAnchor="middle">Semantic</text>
-                         <text x="95" y="52" fontSize="4" fill="var(--on-surface-variant)">Structural</text>
-                         <text x="50" y="98" fontSize="4" fill="var(--on-surface-variant)" textAnchor="middle">Weight</text>
-                         <text x="5" y="52" fontSize="4" fill="var(--on-surface-variant)" textAnchor="end">Outcome</text>
-                         
-                         <polygon 
-                           points={`
-                             50,${50 - (expandedCase.metrics[0]*0.4)} 
-                             ${50 + (expandedCase.metrics[1]*0.4)},50 
-                             50,${50 + (expandedCase.metrics[2]*0.4)} 
-                             ${50 - (expandedCase.metrics[3]*0.4)},50
-                           `} 
-                           fill={`rgba(233, 195, 73, 0.3)`}
-                           stroke={"var(--secondary)"} strokeWidth="1.5"
-                         />
-                       </svg>
-                     </div>
-                     
-                     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {['Semantic Similarity', 'Structural (Facts/Issues)', 'Precedential Weight', 'Outcome Similarity'].map((label, idx) => (
-                          <div key={idx}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.75rem' }}>
-                              <span style={{ color: 'var(--on-surface-variant)' }}>{label}</span>
-                              <span style={{ color: 'var(--on-surface)', fontWeight: 600 }}>{expandedCase.metrics[idx]}%</span>
-                            </div>
-                            <div style={{ height: '4px', background: 'var(--surface-container-lowest)', borderRadius: '2px' }}>
-                              <div style={{ height: '100%', width: `${expandedCase.metrics[idx]}%`, background: 'var(--primary)', borderRadius: '2px' }}></div>
-                            </div>
-                          </div>
-                        ))}
-                     </div>
-                   </div>
-                 </div>
 
-                 {/* Section I: Why this might not apply */}
-                 <div style={{ flex: '1.4', background: expandedCase.outcome === 'Distinguished' || expandedCase.strength === 'Overruled' ? 'rgba(239, 68, 68, 0.1)' : 'var(--surface-container-low)', padding: '2rem', borderRadius: '8px', borderLeft: expandedCase.outcome === 'Distinguished' || expandedCase.strength === 'Overruled' ? '4px solid var(--error)' : '4px solid var(--agent-similarity)', display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', color: expandedCase.outcome === 'Distinguished' || expandedCase.strength === 'Overruled' ? 'var(--error)' : 'var(--agent-similarity)', fontWeight: 700, marginBottom: '1.5rem', letterSpacing: '0.05em' }}>
-                      <AlertTriangle size={20}/> DIFFERENCES & VULNERABILITY (WHY THIS MIGHT NOT APPLY)
-                    </span>
-                    <p className="body-md" style={{ color: 'var(--on-surface)', lineHeight: 1.8, fontSize: '1rem' }}>
-                      {expandedCase.differences}
-                    </p>
-                    
-                    <div style={{ marginTop: 'auto', background: 'var(--surface-container)', padding: '1rem', borderRadius: '4px', borderLeft: '2px solid var(--primary)' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--primary)', display: 'block', marginBottom: '4px' }}>EXPERT INSIGHT</span>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)' }}>
-                        Lawyers distinguish cases to prove why a past ruling shouldn't apply to their facts. Anticipate opposing counsel exploiting the "Contradicting Facts" or "Missing Facts" outlined above.
-                      </span>
+                {/* Section F: Similarity Feature Matrix */}
+                <div style={{ flex: '0.6', background: 'var(--surface-container)', padding: '2rem', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--tertiary)', fontWeight: 700, marginBottom: '2rem', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Target size={18} /> AI SIMILARITY BREAKDOWN
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+                    {/* Radar */}
+                    <div style={{ width: '150px', height: '150px', marginBottom: '1rem' }}>
+                      <svg width="150" height="150" viewBox="0 0 100 100">
+                        <polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="var(--outline-variant-ghost)" />
+                        <polygon points="50,30 70,50 50,70 30,50" fill="none" stroke="var(--outline-variant-ghost)" />
+                        <line x1="50" y1="10" x2="50" y2="90" stroke="var(--outline-variant-ghost)" />
+                        <line x1="10" y1="50" x2="90" y2="50" stroke="var(--outline-variant-ghost)" />
+
+                        <text x="50" y="5" fontSize="4" fill="var(--on-surface-variant)" textAnchor="middle">Semantic</text>
+                        <text x="95" y="52" fontSize="4" fill="var(--on-surface-variant)">Structural</text>
+                        <text x="50" y="98" fontSize="4" fill="var(--on-surface-variant)" textAnchor="middle">Weight</text>
+                        <text x="5" y="52" fontSize="4" fill="var(--on-surface-variant)" textAnchor="end">Outcome</text>
+
+                        <polygon
+                          points={`
+                             50,${50 - (expandedCase.metrics[0] * 0.4)} 
+                             ${50 + (expandedCase.metrics[1] * 0.4)},50 
+                             50,${50 + (expandedCase.metrics[2] * 0.4)} 
+                             ${50 - (expandedCase.metrics[3] * 0.4)},50
+                           `}
+                          fill={`rgba(233, 195, 73, 0.3)`}
+                          stroke={"var(--secondary)"} strokeWidth="1.5"
+                        />
+                      </svg>
                     </div>
-                 </div>
+
+                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {['Semantic Similarity', 'Structural (Facts/Issues)', 'Precedential Weight', 'Outcome Similarity'].map((label, idx) => (
+                        <div key={idx}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.75rem' }}>
+                            <span style={{ color: 'var(--on-surface-variant)' }}>{label}</span>
+                            <span style={{ color: 'var(--on-surface)', fontWeight: 600 }}>{expandedCase.metrics[idx]}%</span>
+                          </div>
+                          <div style={{ height: '4px', background: 'var(--surface-container-lowest)', borderRadius: '2px' }}>
+                            <div style={{ height: '100%', width: `${expandedCase.metrics[idx]}%`, background: 'var(--primary)', borderRadius: '2px' }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section I: Why this might not apply */}
+                <div style={{ flex: '1.4', background: expandedCase.outcome === 'Distinguished' || expandedCase.strength === 'Overruled' ? 'rgba(239, 68, 68, 0.1)' : 'var(--surface-container-low)', padding: '2rem', borderRadius: '8px', borderLeft: expandedCase.outcome === 'Distinguished' || expandedCase.strength === 'Overruled' ? '4px solid var(--error)' : '4px solid var(--agent-similarity)', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', color: expandedCase.outcome === 'Distinguished' || expandedCase.strength === 'Overruled' ? 'var(--error)' : 'var(--agent-similarity)', fontWeight: 700, marginBottom: '1.5rem', letterSpacing: '0.05em' }}>
+                    <AlertTriangle size={20} /> DIFFERENCES & VULNERABILITY (WHY THIS MIGHT NOT APPLY)
+                  </span>
+                  <p className="body-md" style={{ color: 'var(--on-surface)', lineHeight: 1.8, fontSize: '1rem' }}>
+                    {expandedCase.differences}
+                  </p>
+
+                  <div style={{ marginTop: 'auto', background: 'var(--surface-container)', padding: '1rem', borderRadius: '4px', borderLeft: '2px solid var(--primary)' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--primary)', display: 'block', marginBottom: '4px' }}>EXPERT INSIGHT</span>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--on-surface-variant)' }}>
+                      Lawyers distinguish cases to prove why a past ruling shouldn't apply to their facts. Anticipate opposing counsel exploiting the "Contradicting Facts" or "Missing Facts" outlined above.
+                    </span>
+                  </div>
+                </div>
 
               </div>
 
@@ -529,43 +529,43 @@ const ResultsDashboard = () => {
       {/* Main Page Content - Left Panel (Precedent List) */}
       <div style={{ flex: '0 0 540px', display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'relative' }}>
         <h3 className="newsreader" style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FileSearch size={20} style={{ color: 'var(--primary)' }}/> Ranked 
+          <FileSearch size={20} style={{ color: 'var(--primary)' }} /> Ranked
           <LegalTerm term="Precedents" definition="A previous court decision used to decide a new case. Guides future rulings." />
         </h3>
-        
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', paddingRight: '0.5rem', paddingBottom: '2rem' }}>
           {precedentData.map((p, i) => (
             <div key={p.id} className="insight-card" style={{ padding: '1.5rem', backgroundColor: expandedId === p.id ? 'var(--surface-container-highest)' : (i === 0 ? 'var(--surface-container-high)' : 'var(--surface-container)'), border: i === 0 ? '1px solid var(--secondary)' : '1px solid transparent', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-              
-              <div 
+
+              <div
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer' }}
                 onClick={(e) => handleExpand(p.id, e)}
               >
                 <div style={{ flex: 1, paddingRight: '1rem' }}>
                   <h4 className="newsreader" style={{ fontSize: '1.125rem', color: 'var(--on-surface)', marginBottom: '0.25rem' }}>{p.title}</h4>
-                  
+
                   <div className="jurisdiction-timeline" style={{ marginBottom: '8px' }}>
                     <div className="court-node" style={{ opacity: 0.6 }} title="High Court"></div>
                     <div className="court-line"></div>
                     <div className="court-node active" title={`${p.court} (${p.year})`}></div>
                     <span style={{ fontSize: '0.7rem', color: 'var(--on-surface-variant)', marginLeft: '8px' }}>{p.court} ({p.year})</span>
                   </div>
-                  
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                     {[...Array(5)].map((_, idx) => (
-                       <Star key={idx} size={12} fill={idx < p.stars ? "var(--secondary)" : "transparent"} stroke={idx < p.stars ? "var(--secondary)" : "var(--on-surface-variant)"} />
-                     ))}
+                    {[...Array(5)].map((_, idx) => (
+                      <Star key={idx} size={12} fill={idx < p.stars ? "var(--secondary)" : "transparent"} stroke={idx < p.stars ? "var(--secondary)" : "var(--on-surface-variant)"} />
+                    ))}
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
                   <div style={{ fontSize: '1.125rem', color: i === 0 ? 'var(--secondary)' : 'var(--primary)', fontWeight: 700, fontFamily: 'monospace' }}>
                     {p.score}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <Flag 
-                      size={14} 
-                      style={{ color: p.challenged ? 'var(--agent-similarity)' : 'var(--on-surface-variant)', cursor: 'pointer' }} 
+                    <Flag
+                      size={14}
+                      style={{ color: p.challenged ? 'var(--agent-similarity)' : 'var(--on-surface-variant)', cursor: 'pointer' }}
                       onClick={(e) => { e.stopPropagation(); setChallengeOpen(p.id === challengeOpen ? null : p.id); setExpandedId(null); }}
                     />
                   </div>
@@ -592,7 +592,7 @@ const ResultsDashboard = () => {
                 </select>
                 <textarea className="docket-input" rows="3" placeholder="Explain the reasoning (e.g., this case was factually distinguished later)..." style={{ fontSize: '0.75rem', marginBottom: '1rem', resize: 'none' }} onClick={e => e.stopPropagation()}></textarea>
                 <button className="btn-secondary" style={{ marginTop: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '0.5rem' }} onClick={e => e.stopPropagation()}>
-                  <Send size={14}/> Submit Annotation
+                  <Send size={14} /> Submit Annotation
                 </button>
               </div>
             </div>
@@ -602,14 +602,14 @@ const ResultsDashboard = () => {
 
       {/* Main Page Content - Right Panel (Summary / Graph Tabs) */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
-        
+
         {/* Dynamic Context Tabs */}
         <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
           <button className={`nav-link ${activeTab === 'summary' ? 'active' : ''}`} style={{ flex: 1, justifyContent: 'center', border: 'none', background: activeTab === 'summary' ? 'var(--surface-container-high)' : 'transparent', color: activeTab === 'summary' ? 'var(--primary)' : 'var(--on-surface-variant)' }} onClick={() => setActiveTab('summary')}>
-            <BarChart size={18}/> Summary Breakdown
+            <BarChart size={18} /> Summary Breakdown
           </button>
           <button className={`nav-link ${activeTab === 'graph' ? 'active' : ''}`} style={{ flex: 1, justifyContent: 'center', border: 'none', background: activeTab === 'graph' ? 'var(--surface-container-high)' : 'transparent', color: activeTab === 'graph' ? 'var(--primary)' : 'var(--on-surface-variant)' }} onClick={() => setActiveTab('graph')}>
-            <Network size={18}/> Citation / Case Authority Graph
+            <Network size={18} /> Citation / Case Authority Graph
           </button>
         </div>
 
@@ -623,14 +623,14 @@ const ResultsDashboard = () => {
                   The 7-Judge Constitutional Bench ruling in <em>In Re: Interplay (2023)</em> supersedes all historical precedent limiting Section 11 invocation due to unstamped parent documents. Defendant's objection is procedurally void under current binding <LegalTerm term="Case Law" definition="Law created by previous judicial decisions. Guides future interpretations." />.
                 </p>
               </div>
-              
+
               <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem', background: 'var(--surface-container-highest)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--secondary)' }}>
                 {/* VERDICTO SEAL */}
                 <div className="verdicto-seal">
-                   <div className="verdicto-seal-tooltip">
-                     <strong>VERDICTO SEAL AWARDED</strong><br/>
-                     System consensus highly stable (Variance 0.12). Supreme Court constitutional authority directly superimposes input matrix.
-                   </div>
+                  <div className="verdicto-seal-tooltip">
+                    <strong>VERDICTO SEAL AWARDED</strong><br />
+                    System consensus highly stable (Variance 0.12). Supreme Court constitutional authority directly superimposes input matrix.
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
@@ -644,7 +644,7 @@ const ResultsDashboard = () => {
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div className="insight-card" style={{ flex: 1, backgroundColor: 'var(--surface-container)' }}>
                 <h4 className="newsreader" style={{ fontSize: '1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BarChart size={18} style={{ color: 'var(--primary)' }}/> Structural Similarity
+                  <BarChart size={18} style={{ color: 'var(--primary)' }} /> Structural Similarity
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {[
@@ -668,10 +668,10 @@ const ResultsDashboard = () => {
 
               <div className="insight-card" style={{ flex: 1, backgroundColor: 'var(--surface-container-low)' }}>
                 <h4 className="newsreader" style={{ fontSize: '1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileJson size={18} style={{ color: 'var(--tertiary)' }}/> Deep Explainability
+                  <FileJson size={18} style={{ color: 'var(--tertiary)' }} /> Deep Explainability
                 </h4>
                 <p className="body-md" style={{ marginBottom: '1rem' }}>
-                  The <strong>Scheduler Agent</strong> actively routed a pipeline repair. In pass 2, it detected a collision between <em>NN Global (2023)</em> and <em>In Re: Interplay (2023)</em>. 
+                  The <strong>Scheduler Agent</strong> actively routed a pipeline repair. In pass 2, it detected a collision between <em>NN Global (2023)</em> and <em>In Re: Interplay (2023)</em>.
                 </p>
                 <div style={{ padding: '1rem', backgroundColor: 'var(--surface-container-lowest)', borderRadius: '0.25rem', borderLeft: `3px solid var(--agent-evaluator)` }}>
                   <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--agent-evaluator)', fontWeight: 700, marginBottom: '0.25rem' }}>EVALUATOR NODE RESOLUTION</span>
@@ -714,22 +714,22 @@ const ResultsDashboard = () => {
                 height={600}
                 nodeCanvasObject={(node, ctx, globalScale) => {
                   const label = node.name;
-                  const fontSize = 12/globalScale;
+                  const fontSize = 12 / globalScale;
                   ctx.font = `bold ${fontSize}px Sans-Serif`;
-                  
+
                   ctx.beginPath();
                   ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
                   ctx.fillStyle = node.color;
                   ctx.fill();
                   ctx.shadowColor = node.color;
                   ctx.shadowBlur = 10;
-                  
+
                   const textWidth = ctx.measureText(label).width;
                   const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2);
-                  
+
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'middle';
-                  ctx.shadowBlur = 0; 
+                  ctx.shadowBlur = 0;
                   ctx.fillStyle = node.textColor;
                   ctx.fillText(label, node.x, node.y);
                 }}
