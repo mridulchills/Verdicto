@@ -10,7 +10,7 @@ import PastCases from './pages/PastCases';
 import Profile from './pages/Profile';
 import ExperimentMode from './pages/ExperimentMode';
 import './index.css';
-
+//Making changes
 function App() {
   return (
     <BrowserRouter>
