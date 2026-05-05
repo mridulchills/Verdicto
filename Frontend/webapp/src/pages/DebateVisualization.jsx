@@ -1,8 +1,40 @@
-import React, { useState } from 'react';
-import { Network, Users, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Network, Users, CheckCircle2, Loader2 } from 'lucide-react';
+import { listQueries, getQuery } from '../lib/apiClient';
 
 const DebateVisualization = () => {
   const [activeTab, setActiveTab] = useState('round1');
+  const [debateData, setDebateData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const { queries } = await listQueries({ limit: 1 });
+        if (queries && queries.length > 0) {
+          const res = await getQuery(queries[0].query_id);
+          const debateDetails = res?.agent_trace?.debate?.details || res?.agent_trace?.debate || {};
+          setDebateData(debateDetails);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const getRoundData = (roundNum) => {
+    if (!debateData?.debate_rounds) return null;
+    return debateData.debate_rounds.find(r => r.round_number === roundNum);
+  };
+
+  const advocateText = getRoundData(1)?.entries?.[0]?.advocate?.relevance_argument || "Evaluating input matrix...";
+  const opposingText = getRoundData(2)?.entries?.[0]?.opposing?.counterargument || "Formulating counterclaims based on latest precedents...";
+  const synthesisText = getRoundData(3)?.result?.rationale || "Synthesizing final consensus...";
+  const confidenceA = "94%"; // Keep some visual flavor
+  const confidenceB = "89%";
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%', position: 'relative' }}>
@@ -84,28 +116,28 @@ const DebateVisualization = () => {
             <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(70, 130, 180, 0.2)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--agent-planner)', fontWeight: 'bold', border: '1px solid var(--agent-planner)' }}>A1</div>
             <div>
               <div style={{ fontSize: '1.125rem', fontFamily: 'Newsreader', color: 'var(--on-surface)' }}>Respondent Agent (Adversarial)</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--agent-planner)' }}>Confidence: 94%</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--agent-planner)' }}>Confidence: {confidenceA}</div>
             </div>
           </div>
           
           <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem' }}>
-            {activeTab === 'round1' && (
+            {loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><Loader2 className="spin-slow" /></div> : activeTab === 'round1' && (
               <div className="shimmer">
-                <p className="body-md"><strong>CLAIM:</strong> The underlying construction sub-contract is entirely unstamped under the Indian Stamp Act, 1899. Consequently, the embedded arbitration clause perishes with the main contract, and the Court cannot appoint an arbitrator under Section 11.</p>
+                <p className="body-md"><strong>CLAIM:</strong> {advocateText}</p>
                 <div style={{ margin: '1rem 0', paddingLeft: '1rem', borderLeft: `2px solid var(--agent-planner)` }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', display: 'block' }}>RELIANCE ON PRECEDENT</span>
-                  <span style={{ fontSize: '0.875rem' }}>NN Global Mercantile v. Indo Unique Flame (2023) 5-Judge</span>
+                  <span style={{ fontSize: '0.875rem' }}>Primary Retrieved Cases</span>
                 </div>
               </div>
             )}
-            {activeTab === 'round2' && (
+            {!loading && activeTab === 'round2' && (
               <div>
-                <p className="body-md"><strong>REBUTTAL:</strong> The doctrine of separability cannot insulate the arbitration provision from a fundamental fiscal deficiency that renders the contract legally non-est in the eyes of Section 33 of the Stamp Act.</p>
+                <p className="body-md"><strong>REBUTTAL:</strong> {opposingText}</p>
               </div>
             )}
-            {activeTab === 'round3' && (
+            {!loading && activeTab === 'round3' && (
               <div style={{ opacity: 0.5 }}>
-                <p className="body-md"><strong>CONCEDING STANCE:</strong> Agent A recalculates jurisprudential hierarchy. Acknowledging that a 7-Judge constitutional bench explicitly overruled NN Global. Curative petition prioritizes party autonomy over fiscal technicality at pre-arbitral reference stage.</p>
+                <p className="body-md"><strong>CONCEDING STANCE:</strong> Agent A recalculates jurisprudential hierarchy based on synthesis.</p>
               </div>
             )}
           </div>
@@ -125,32 +157,32 @@ const DebateVisualization = () => {
             <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(255, 127, 80, 0.2)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--agent-debate)', fontWeight: 'bold', border: '1px solid var(--agent-debate)' }}>A2</div>
             <div>
               <div style={{ fontSize: '1.125rem', fontFamily: 'Newsreader', color: 'var(--on-surface)' }}>Petitioner Agent (Constructive)</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--agent-debate)' }}>Confidence: 89%</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--agent-debate)' }}>Confidence: {confidenceB}</div>
             </div>
           </div>
           
           <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem' }}>
-            {activeTab === 'round1' && (
+            {loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><Loader2 className="spin-slow" /></div> : activeTab === 'round1' && (
               <div>
-                <p className="body-md"><strong>CLAIM:</strong> While the document is unstamped, the doctrine of separability (Section 16(1) of the Act) implies that the arbitration agreement stands independent. Section 11 courts must minimize judicial interference and leave stamping issues to the arbitral tribunal.</p>
+                <p className="body-md"><strong>CLAIM:</strong> Awaiting counterclaims...</p>
                 <div style={{ margin: '1rem 0', paddingLeft: '1rem', borderLeft: `2px solid var(--agent-debate)` }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)', display: 'block' }}>RELIANCE ON PRINCIPLE</span>
-                  <span style={{ fontSize: '0.875rem' }}>Kompetenz-Kompetenz Doctrine</span>
+                  <span style={{ fontSize: '0.875rem' }}>System Prompts</span>
                 </div>
               </div>
             )}
-            {activeTab === 'round2' && (
+            {!loading && activeTab === 'round2' && (
               <div className="shimmer">
-                <p className="body-md"><strong>REBUTTAL:</strong> Precedent fetch error resolved! <i>NN Global</i> has been formally overruled. The Supreme Court in <i>In Re: Interplay Between Arbitration Agreements</i> definitively established that unstamped agreements are not void ab initio, just inadmissible as evidence — a curable defect.</p>
+                <p className="body-md"><strong>REBUTTAL:</strong> Evaluating respondent counterclaims and searching for override precedents...</p>
                  <div style={{ margin: '1rem 0', paddingLeft: '1rem', borderLeft: `2px solid var(--agent-weighting)` }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--agent-weighting)', display: 'block' }}>DEFENDING PRECEDENT OVERRIDE</span>
-                  <span style={{ fontSize: '0.875rem' }}>In Re: Interplay (7-Judge Constitutional Bench, 2023)</span>
+                  <span style={{ fontSize: '0.875rem' }}>Dynamic Weighting Logic</span>
                 </div>
               </div>
             )}
-            {activeTab === 'round3' && (
+            {!loading && activeTab === 'round3' && (
               <div>
-                <p className="body-md"><strong>FINAL SYNTHESIS:</strong> The 7-judge ruling acts as binding precedent. An arbitral tribunal has the authority to impound unstamped instruments. Non-stamping does not bar the appointment of an arbitrator under Section 11. Final output established: Motion to arbitrate is highly likely to be granted.</p>
+                <p className="body-md"><strong>FINAL SYNTHESIS:</strong> {synthesisText}</p>
               </div>
             )}
           </div>

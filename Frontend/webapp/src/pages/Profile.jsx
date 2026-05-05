@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Briefcase, Activity, Settings2, Shield, Eye, Lock, Edit3 } from 'lucide-react';
+import { getSystemStats } from '../lib/apiClient';
 
 const Profile = () => {
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    getSystemStats().then(setStats).catch(() => {});
+  }, []);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', height: '100%', paddingBottom: '3rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -55,8 +60,8 @@ const Profile = () => {
                 <Activity size={24} style={{ color: 'var(--primary)' }}/>
               </div>
               <div>
-                <div style={{ fontSize: '2rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--secondary)' }}>142</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>TOTAL PREDICTIONS</div>
+                <div style={{ fontSize: '2rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--secondary)' }}>{stats?.total_queries ?? '—'}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>TOTAL QUERIES RUN</div>
               </div>
             </div>
             
@@ -65,8 +70,8 @@ const Profile = () => {
                 <Briefcase size={24} style={{ color: 'var(--tertiary)' }}/>
               </div>
               <div>
-                <div style={{ fontSize: '2rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--on-surface)' }}>92%</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>AVG CONFIDENCE SCORE</div>
+                <div style={{ fontSize: '2rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--on-surface)' }}>{stats?.total_cases ?? '—'}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>INDEXED CASES</div>
               </div>
             </div>
           </div>
@@ -82,10 +87,8 @@ const Profile = () => {
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--on-surface-variant)', marginBottom: '0.5rem' }}>DEFAULT JURISDICTION</label>
                 <select className="docket-input" style={{ width: '100%', marginBottom: '1.5rem', background: 'transparent' }}>
-                  <option>US Federal Circuit</option>
-                  <option>2nd Circuit</option>
-                  <option>9th Circuit</option>
-                  <option>Supreme Court</option>
+                  <option>Supreme Court of India</option>
+                  <option>High Court</option>
                 </select>
 
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--on-surface-variant)', marginBottom: '0.5rem' }}>PREFERRED EXPORT FORMAT</label>

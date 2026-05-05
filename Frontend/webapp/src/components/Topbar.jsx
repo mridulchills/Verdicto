@@ -1,7 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Bookmark, Share2, HelpCircle, Bell, Search } from 'lucide-react';
+import { getSystemStats } from '../lib/apiClient';
 
 const Topbar = () => {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    getSystemStats().then(setStats).catch(() => {});
+  }, []);
+
   return (
     <header style={{ height: '72px', borderBottom: '1px solid var(--outline-variant-ghost)', padding: '0 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--surface)', flexShrink: 0 }}>
       {/* Search and Context info */}
@@ -28,21 +35,21 @@ const Topbar = () => {
         <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--outline-variant-ghost)' }}></div>
 
         <div>
-          <span style={{ color: 'var(--on-surface-variant)', fontSize: '0.75rem', fontWeight: 600 }}>CURRENT TASK</span>
-          <div className="newsreader" style={{ fontSize: '1.25rem', marginTop: '2px', color: 'var(--on-surface)' }}>Case Analysis — #91B (Torts vs Logistics)</div>
+          <span style={{ color: 'var(--on-surface-variant)', fontSize: '0.75rem', fontWeight: 600 }}>VERDICTO ENGINE</span>
+          <div className="newsreader" style={{ fontSize: '1.25rem', marginTop: '2px', color: 'var(--on-surface)' }}>Multi-Agent Legal Research</div>
         </div>
         
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div className="chip status-chip running">
-            <span className="dot"></span> RUNNING
+            <span className="dot"></span> {stats ? 'ONLINE' : 'CONNECTING'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.65rem', color: 'var(--tertiary)' }}>ITERATIONS</span>
-            <span style={{ fontSize: '0.875rem', fontWeight: 700, fontFamily: 'monospace' }}>4 / 10</span>
+            <span style={{ fontSize: '0.65rem', color: 'var(--tertiary)' }}>CASES</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, fontFamily: 'monospace' }}>{stats?.total_cases ?? '—'}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.65rem', color: 'var(--tertiary)' }}>EVAL SCORE</span>
-            <span style={{ fontSize: '0.875rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--secondary)' }}>88%</span>
+            <span style={{ fontSize: '0.65rem', color: 'var(--tertiary)' }}>VECTORS</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--secondary)' }}>{stats?.faiss_index_size ?? '—'}</span>
           </div>
         </div>
       </div>
@@ -51,7 +58,6 @@ const Topbar = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <button className="icon-btn" style={{ position: 'relative' }}>
           <Bell size={18} /> 
-          <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', backgroundColor: 'var(--error)', borderRadius: '50%' }}></span>
           Alerts
         </button>
         <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--outline-variant-ghost)' }}></div>

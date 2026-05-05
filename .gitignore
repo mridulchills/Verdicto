@@ -1,7 +1,13 @@
 # Python
 Backend/venv/
+backend/venv/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Node
 Frontend/node_modules/
@@ -9,11 +15,26 @@ Frontend/dist/
 Frontend/webapp/node_modules/
 Frontend/webapp/dist/
 
-# Data
+# Data (local storage — gitignored)
 Data/
+data/
+data/raw/
+data/processed/
+data/embeddings/
+data/index/
+*.index
+*.npy
 
 # Env
 .env
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Docker
+postgres_data/
+
+# IDE
+.vscode/
+.idea/

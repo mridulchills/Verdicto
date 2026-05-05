@@ -1,38 +1,65 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Activity, Terminal, BrainCircuit, RefreshCw, Compass, Search, Combine, Scale, MessageSquare, Network, ShieldCheck, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { queryLegalCases } from '../lib/apiClient';
 
 const ProgressDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryResult = location?.state?.queryResult;
+  const queryText = location?.state?.queryText || '';
+  const [apiResult, setApiResult] = useState(queryResult || null);
+  const [apiError, setApiError] = useState(null);
+  
+  // If we already have results (e.g. from a completed query), redirect immediately
+  useEffect(() => {
+    if (apiResult) {
+      const timer = setTimeout(() => {
+        navigate('/results', { state: { queryResult: apiResult, queryText } });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [apiResult, queryText, navigate]);
+
+  useEffect(() => {
+    if (!apiResult && queryText) {
+      queryLegalCases({ query: queryText })
+        .then(res => setApiResult(res))
+        .catch(err => setApiError(err.message));
+    }
+  }, [queryText, apiResult]);
+
   const [stage, setStage] = useState(0); 
   const bottomRef = useRef(null);
 
   // Dynamic simulation timeline with a loop
   useEffect(() => {
+    if (apiResult) return; // Don't start simulation if we already have results
+
     const sequence = [
       { t: 0, s: 0 },         // 0: Planner
-      { t: 6500, s: 1 },      // 1: Retriever (Pass 1)
-      { t: 13000, s: 2 },     // 2: Similarity (Pass 1: insufficient)
-      { t: 19500, s: 3 },     // 3: Evaluator catches issue
-      { t: 26000, s: 4 },     // 4: Scheduler identifies loop -> requests broader search
-      { t: 32500, s: 5 },     // 5: Retriever (Pass 2)
-      { t: 39000, s: 6 },     // 6: Similarity (Pass 2)
-      { t: 45500, s: 7 },     // 7: Weighting 
-      { t: 52000, s: 8 },     // 8: Evaluator logs variance -> triggered
-      { t: 58500, s: 9 },     // 9: Debater
-      { t: 65000, s: 10 },    // 10: Scheduler resolves
-      { t: 71500, s: 11 },    // 11: End (push to Results)
+      { t: 2500, s: 1 },      // 1: Retriever (Pass 1)
+      { t: 5000, s: 2 },      // 2: Similarity (Pass 1)
+      { t: 7500, s: 3 },      // 3: Evaluator catches issue
+      { t: 10000, s: 4 },     // 4: Scheduler identifies loop
+      { t: 12500, s: 5 },     // 5: Retriever (Pass 2)
+      { t: 15000, s: 6 },     // 6: Similarity (Pass 2)
+      { t: 17500, s: 7 },     // 7: Weighting 
+      { t: 20000, s: 8 },     // 8: Evaluator
+      { t: 22500, s: 9 },     // 9: Debater
+      { t: 25000, s: 10 },    // 10: Scheduler resolves
     ];
     
     let timeouts = sequence.map(event => {
        return setTimeout(() => {
-          if (event.s === 11) navigate('/results');
-          else setStage(event.s);
+          if (!apiResult) {
+            setStage(event.s);
+          }
        }, event.t);
     });
     
     return () => timeouts.forEach(clearTimeout);
-  }, [navigate]);
+  }, [apiResult]);
   
   // auto scroll logs
   useEffect(() => {
@@ -69,88 +96,72 @@ const ProgressDashboard = () => {
   if (stage === 9) currentAgentTag = "DEBATER";
 
   const renderLog = () => {
+    if (apiResult?.agent_trace) {
+      const trace = apiResult.agent_trace;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {Object.entries(trace).map(([agentKey, entry], idx) => {
+            if (!entry) return null;
+            const agent = agents[agentKey.toUpperCase()] || { color: 'var(--primary)', name: agentKey };
+            return (
+              <div key={idx} className="log-block">
+                <div style={{ color: agent.color }}>[{agent.name.toUpperCase()}] {entry.status.toUpperCase()}</div>
+                <div>&gt; Latency: {entry.latency_ms.toFixed(0)}ms</div>
+                {entry.details && Object.entries(entry.details).map(([k, v], i) => (
+                  <div key={i}>&gt; {k}: {typeof v === 'object' ? JSON.stringify(v).substring(0, 100) : String(v)}</div>
+                ))}
+              </div>
+            );
+          })}
+          <div style={{ color: 'var(--secondary)', marginTop: '1rem' }}>&gt; Final consensus reached in {apiResult.processing_time_ms}ms.</div>
+          <div ref={bottomRef} />
+        </div>
+      );
+    }
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {stage >= 0 && (
           <div className="log-block">
             <div style={{ color: 'var(--agent-planner)' }}>[PLANNER] Execution Start...</div>
-            <div>&gt; Decomposing arbitration & stamp act vectors...</div>
-            <div>&gt; Identifying target statute: Arbitration Act 1996 Sec 11...</div>
+            <div>&gt; Decomposing query vectors...</div>
+            <div>&gt; Identifying target statutes: {queryText.toLowerCase().includes('stamp') ? 'Stamp Act, ' : ''} Arbitration Act...</div>
           </div>
         )}
         {stage >= 1 && (
           <div className="log-block">
-            <div style={{ color: 'var(--agent-retriever)' }}>[RETRIEVER] Scanning High Court Corpus...</div>
-            <div>&gt; Query: `Section 11 unstamped arbitration clause validity`</div>
-            <div>&gt; Found 12 relevant High Court cases. Extracting Top-3.</div>
+            <div style={{ color: 'var(--agent-retriever)' }}>[RETRIEVER] Scanning Legal Corpus...</div>
+            <div>&gt; Query: `{queryText.substring(0, 50)}...`</div>
+            <div>&gt; Searching for relevant precedents...</div>
           </div>
         )}
         {stage >= 2 && (
           <div className="log-block">
             <div style={{ color: 'var(--agent-similarity)' }}>[SIMILARITY] Factual Node Mapping...</div>
-            <div>&gt; HC Precedents mapped. Confidence score: 0.42...</div>
-          </div>
-        )}
-        {stage >= 3 && (
-          <div className="log-block" style={{ borderLeft: '2px solid var(--error)', paddingLeft: '8px' }}>
-            <div style={{ color: 'var(--agent-evaluator)' }}>[EVALUATOR] Structural Integrity Check...</div>
-            <div style={{ color: 'var(--error)' }}>&gt; ERROR: Crucial jurisdictional mismatch detected.</div>
-            <div>&gt; Input requires Indian Supreme Court precedents, only High Court data fetched.</div>
-            <div>&gt; Raising fatal flag. Haulting linear pipeline.</div>
-          </div>
-        )}
-        {stage >= 4 && (
-          <div className="log-block" style={{ borderLeft: '2px solid var(--agent-scheduler)', paddingLeft: '8px', background: 'rgba(157, 126, 219, 0.05)' }}>
-             <div style={{ color: 'var(--agent-scheduler)' }}>[SCHEDULER] Self-Correction Triggered...</div>
-             <div>&gt; Rerouting task explicitly to Retriever Agent.</div>
-             <div style={{ color: 'var(--agent-scheduler)' }}>&gt; UPDATED COMMAND: "Expand vector limits to strictly enforce Supreme Court registry."</div>
-             <div>&gt; Iteration Cycle 2 Initialized.</div>
-          </div>
-        )}
-        {stage >= 5 && (
-          <div className="log-block">
-            <div style={{ color: 'var(--agent-retriever)' }}>[RETRIEVER] Scanning Supreme Court Corpus (Pass 2)...</div>
-            <div>&gt; Query: `Supreme Court Section 11 Stamp Act invalidity -HC`</div>
-            <div>&gt; Found 32 strictly matching cases. Extracting Top-K (K=5).</div>
-            <div>&gt; Ranked matches: NN Global (2023), SMS Tea (2011), In Re: Interplay (2023).</div>
-          </div>
-        )}
-        {stage >= 6 && (
-          <div className="log-block">
-            <div style={{ color: 'var(--agent-similarity)' }}>[SIMILARITY] Factual Node Mapping (Pass 2)...</div>
-            <div>&gt; NN Global (2023) - 98% factual match.</div>
-            <div>&gt; In Re: Interplay (2023) - 97% factual match.</div>
+            <div>&gt; Mapping input facts to vector space...</div>
           </div>
         )}
         {stage >= 7 && (
           <div className="log-block">
             <div style={{ color: 'var(--agent-weighting)' }}>[WEIGHTING] Hierarchical Graph Traversal...</div>
-            <div style={{ color: 'var(--error)' }}>[WARNING] Conflicting precedent chains detected.</div>
-            <div>&gt; NN Global (5-Judge Bench) vs In Re: Interplay (7-Judge Bench).</div>
+            <div>&gt; Calculating authoritative weights...</div>
           </div>
         )}
         {stage >= 8 && (
           <div className="log-block">
-            <div style={{ color: 'var(--agent-evaluator)' }}>[EVALUATOR] Variance Inspection...</div>
-            <div>&gt; Similarity Variance = 0.81 (Threshold &gt; 0.3)</div>
-            <div>&gt; Direct contradiction in Top-2 precedents. Routing to Debate.</div>
+            <div style={{ color: 'var(--agent-evaluator)' }}>[EVALUATOR] Structural Integrity Check...</div>
+            <div>&gt; Verifying jurisprudential consistency...</div>
           </div>
         )}
-        {stage >= 9 && (
-          <div className="log-block">
-            <div style={{ color: 'var(--agent-debate)' }}>[DEBATER] Constructive vs Adversarial Instantiation...</div>
-            <div>&gt; [Agent A] Claim: Rely on NN Global — uncurable defect.</div>
-            <div>&gt; [Agent B] Rebuttal: In Re: Interplay is larger bench. Separability rule.</div>
-            <div>&gt; Running Synthesis Round...</div>
-          </div>
+        {apiError && (
+           <div style={{ color: 'var(--error)', padding: '1rem', border: '1px solid var(--error)', borderRadius: '4px' }}>
+             <strong>BACKEND ERROR:</strong> {apiError}
+             <div style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>Please ensure the FastAPI server is running on port 8000.</div>
+           </div>
         )}
-        {stage >= 10 && (
-          <div className="log-block">
-            <div style={{ color: 'var(--agent-scheduler)' }}>[SCHEDULER] Convergence Achieved.</div>
-            <div>&gt; Debate resolved in favor of In Re: Interplay.</div>
-            <div>&gt; Evaluator Variance drops to 0.12. Finalizing output.</div>
-          </div>
-        )}
+        <div style={{ color: agents[currentAgentTag]?.color || 'var(--primary)', marginTop: 'auto' }}>
+          &gt; {apiResult ? '[ANALYSIS COMPLETE]' : `[EXECUTING: ${currentAgentTag}]`}
+        </div>
         <div ref={bottomRef} />
       </div>
     );
