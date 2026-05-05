@@ -66,13 +66,13 @@ class Settings(BaseSettings):
 
     # ── Gemini Models & Rate Limits ───────────────────────────────────────
     gemini_rate_limit_rpm: int = 60
-    gemini_model_flash: str = "gemini-1.5-flash"
-    gemini_model_pro: str = "gemini-1.5-pro"
+    gemini_model_flash: str = "gemini-2.0-flash"
+    gemini_model_pro: str = "gemini-2.5-pro"
     
     # ── Embedding Models ──────────────────────────────────────────────────
     use_local_embeddings: bool = True
     embedding_model_local: str = "all-MiniLM-L6-v2"
-    gemini_embedding_model: str = "text-embedding-004"
+    gemini_embedding_model: str = "gemini-embedding-001"
 
     # ── API Server ────────────────────────────────────────────────────────
     api_host: str = "0.0.0.0"

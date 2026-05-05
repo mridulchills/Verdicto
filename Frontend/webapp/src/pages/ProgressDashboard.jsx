@@ -13,13 +13,20 @@ const ProgressDashboard = () => {
   
   // If we already have results (e.g. from a completed query), redirect immediately
   useEffect(() => {
-    if (apiResult) {
-      const timer = setTimeout(() => {
-        navigate('/results', { state: { queryResult: apiResult, queryText } });
-      }, 500);
+    if (apiResult?.status === 'complete') {
+      const timer = setTimeout(async () => {
+        // Fetch the final results using getQuery just in case
+        try {
+            const { getQuery } = await import('../lib/apiClient');
+            const finalResult = await getQuery(apiResult.query_id);
+            navigate('/results', { state: { queryResult: finalResult, queryText } });
+        } catch (e) {
+            navigate('/results', { state: { queryResult: apiResult, queryText } });
+        }
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [apiResult, queryText, navigate]);
+  }, [apiResult?.status, apiResult?.query_id, queryText, navigate]);
 
   useEffect(() => {
     if (!apiResult && queryText) {
@@ -32,39 +39,51 @@ const ProgressDashboard = () => {
   const [stage, setStage] = useState(0); 
   const bottomRef = useRef(null);
 
-  // Dynamic simulation timeline with a loop
+  // Poll backend status every 1.5 seconds
   useEffect(() => {
-    if (apiResult) return; // Don't start simulation if we already have results
+    if (!apiResult?.query_id || apiResult.status === 'complete') return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const { getQueryStatus } = await import('../lib/apiClient');
+        const statusData = await getQueryStatus(apiResult.query_id);
+        
+        // Merge trace updates into the component state
+        setApiResult(prev => ({
+          ...prev,
+          status: statusData.status,
+          processing_time_ms: statusData.processing_time_ms,
+          agent_trace: statusData.agent_trace || prev?.agent_trace
+        }));
 
-    const sequence = [
-      { t: 0, s: 0 },         // 0: Planner
-      { t: 2500, s: 1 },      // 1: Retriever (Pass 1)
-      { t: 5000, s: 2 },      // 2: Similarity (Pass 1)
-      { t: 7500, s: 3 },      // 3: Evaluator catches issue
-      { t: 10000, s: 4 },     // 4: Scheduler identifies loop
-      { t: 12500, s: 5 },     // 5: Retriever (Pass 2)
-      { t: 15000, s: 6 },     // 6: Similarity (Pass 2)
-      { t: 17500, s: 7 },     // 7: Weighting 
-      { t: 20000, s: 8 },     // 8: Evaluator
-      { t: 22500, s: 9 },     // 9: Debater
-      { t: 25000, s: 10 },    // 10: Scheduler resolves
-    ];
+        if (statusData.status === 'complete' || statusData.status === 'failed') {
+          clearInterval(interval);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 1500);
     
-    let timeouts = sequence.map(event => {
-       return setTimeout(() => {
-          if (!apiResult) {
-            setStage(event.s);
-          }
-       }, event.t);
-    });
-    
-    return () => timeouts.forEach(clearTimeout);
-  }, [apiResult]);
-  
+    return () => clearInterval(interval);
+  }, [apiResult?.query_id, apiResult?.status]);
+
+  // Determine stage dynamically from live trace
+  useEffect(() => {
+    if (!apiResult?.agent_trace) return;
+    const trace = apiResult.agent_trace;
+    if (trace.scheduler) setStage(10);
+    else if (trace.debate) setStage(9);
+    else if (trace.evaluator) setStage(8);
+    else if (trace.precedent_weighting) setStage(7);
+    else if (trace.similarity) setStage(2); // (Fallback mapped manually if missing)
+    else if (trace.retriever) setStage(1);
+    else if (trace.query_planner) setStage(0);
+  }, [apiResult?.agent_trace]);
+
   // auto scroll logs
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [stage]);
+  }, [stage, apiResult?.agent_trace]);
 
   const agents = {
     PLANNER: { color: 'var(--agent-planner)', icon: Compass, name: 'Planner' },
@@ -119,40 +138,64 @@ const ProgressDashboard = () => {
       );
     }
 
+    const trace = apiResult?.agent_trace || {};
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {stage >= 0 && (
+        <div className="log-block">
+          <div style={{ color: 'var(--agent-planner)' }}>[INITIALIZING] Establishing pipeline...</div>
+          <div>&gt; Query received, orchestrating multi-agent system.</div>
+        </div>
+
+        {trace.query_planner && (
           <div className="log-block">
-            <div style={{ color: 'var(--agent-planner)' }}>[PLANNER] Execution Start...</div>
-            <div>&gt; Decomposing query vectors...</div>
-            <div>&gt; Identifying target statutes: {queryText.toLowerCase().includes('stamp') ? 'Stamp Act, ' : ''} Arbitration Act...</div>
+            <div style={{ color: 'var(--agent-planner)' }}>[PLANNER] Query Analysis Complete</div>
+            <div>&gt; Domain: {trace.query_planner.details?.legal_domain || 'Unknown'}</div>
+            <div>&gt; Issues Extracted: {trace.query_planner.details?.issues_count || 0}</div>
+            <div>&gt; Confidence: {trace.query_planner.details?.confidence || 0}</div>
           </div>
         )}
-        {stage >= 1 && (
+
+        {trace.retriever && (
           <div className="log-block">
-            <div style={{ color: 'var(--agent-retriever)' }}>[RETRIEVER] Scanning Legal Corpus...</div>
-            <div>&gt; Query: `{queryText.substring(0, 50)}...`</div>
-            <div>&gt; Searching for relevant precedents...</div>
+            <div style={{ color: 'var(--agent-retriever)' }}>[RETRIEVER] Scanning Legal Corpus</div>
+            <div>&gt; Semantic FAISS hits: {trace.retriever.details?.faiss_hits || 0}</div>
+            <div>&gt; Keyword BM25 hits: {trace.retriever.details?.bm25_hits || 0}</div>
+            <div>&gt; After RRF fusion: {trace.retriever.details?.after_rrf || 0} precedents</div>
           </div>
         )}
-        {stage >= 2 && (
+
+        {trace.precedent_weighting && (
           <div className="log-block">
-            <div style={{ color: 'var(--agent-similarity)' }}>[SIMILARITY] Factual Node Mapping...</div>
-            <div>&gt; Mapping input facts to vector space...</div>
+            <div style={{ color: 'var(--agent-weighting)' }}>[WEIGHTING] Adjusting Precedent Weights</div>
+            <div>&gt; Candidates reranked: {trace.precedent_weighting.details?.reranked || 0}</div>
           </div>
         )}
-        {stage >= 7 && (
+
+        {trace.debate && (
           <div className="log-block">
-            <div style={{ color: 'var(--agent-weighting)' }}>[WEIGHTING] Hierarchical Graph Traversal...</div>
-            <div>&gt; Calculating authoritative weights...</div>
+            <div style={{ color: 'var(--agent-debater)' }}>[DEBATE] Multi-Agent Adversarial Debate</div>
+            <div>&gt; Debate Rounds: {trace.debate.details?.rounds || 0}</div>
+            <div>&gt; Disagreement Flags: {trace.debate.details?.disputes || 0}</div>
           </div>
         )}
-        {stage >= 8 && (
+
+        {trace.evaluator && (
           <div className="log-block">
-            <div style={{ color: 'var(--agent-evaluator)' }}>[EVALUATOR] Structural Integrity Check...</div>
-            <div>&gt; Verifying jurisprudential consistency...</div>
+            <div style={{ color: 'var(--agent-evaluator)' }}>[EVALUATOR] Structural Integrity Check</div>
+            <div>&gt; System Confidence: {trace.evaluator.details?.confidence || 0}</div>
+            <div>&gt; Precision@5: {trace.evaluator.details?.precision_at_5 || 0}</div>
+            <div>&gt; NDCG@10: {trace.evaluator.details?.ndcg_at_10 || 0}</div>
           </div>
         )}
+
+        {trace.scheduler && (
+          <div className="log-block">
+            <div style={{ color: 'var(--agent-scheduler)' }}>[SCHEDULER] Pipeline Finalized</div>
+            <div>&gt; Total Iterations: {trace.scheduler.details?.iterations || 1}</div>
+            <div>&gt; Final Output Confidence: {trace.scheduler.details?.final_confidence || 0}</div>
+          </div>
+        )}
+
         {apiError && (
            <div style={{ color: 'var(--error)', padding: '1rem', border: '1px solid var(--error)', borderRadius: '4px' }}>
              <strong>BACKEND ERROR:</strong> {apiError}
@@ -160,7 +203,7 @@ const ProgressDashboard = () => {
            </div>
         )}
         <div style={{ color: agents[currentAgentTag]?.color || 'var(--primary)', marginTop: 'auto' }}>
-          &gt; {apiResult ? '[ANALYSIS COMPLETE]' : `[EXECUTING: ${currentAgentTag}]`}
+          &gt; {apiResult?.status === 'complete' ? '[ANALYSIS COMPLETE]' : `[EXECUTING: ${currentAgentTag}]`}
         </div>
         <div ref={bottomRef} />
       </div>

@@ -44,6 +44,7 @@ class SchedulerAgent(BaseAgent):
             planner = QueryPlannerAgent()
             plan_result = await planner.execute({"query_id": qid, "query": query})
             trace["query_planner"] = {"agent_name": "query_planner", "status": "complete", "details": {"legal_domain": plan_result.get("legal_domain"), "issues_count": len(plan_result.get("extracted_issues", [])), "confidence": plan_result.get("confidence")}}
+            if "trace_callback" in input_data: await input_data["trace_callback"](trace)
 
             best_result: dict[str, Any] = {}
             best_eval: dict[str, Any] = {}
@@ -53,17 +54,18 @@ class SchedulerAgent(BaseAgent):
                 iteration += 1
                 logger.info("scheduler.iteration", iteration=iteration, query_id=qid)
 
-                # Step 2: Retriever
                 retriever = RetrieverAgent(db_session=self._db)
                 retriever_input = {**plan_result, "filters": filters}
                 retrieval_result = await retriever.execute(retriever_input)
                 trace["retriever"] = {"agent_name": "retriever", "status": "complete", "details": {"faiss_hits": retrieval_result.get("faiss_hits", 0), "bm25_hits": retrieval_result.get("bm25_hits", 0), "after_rrf": retrieval_result.get("after_rrf", 0)}}
+                if "trace_callback" in input_data: await input_data["trace_callback"](trace)
 
                 # Step 3: Precedent Weighting
                 weighter = PrecedentWeighterAgent(db_session=self._db)
                 weight_input = {**plan_result, "candidates": retrieval_result.get("candidates", [])}
                 weight_result = await weighter.execute(weight_input)
                 trace["precedent_weighting"] = {"agent_name": "precedent_weighting", "status": "complete", "details": {"reranked": weight_result.get("reranked_count", 0)}}
+                if "trace_callback" in input_data: await input_data["trace_callback"](trace)
 
                 ranked_cases = weight_result.get("ranked_cases", [])
 
@@ -74,6 +76,7 @@ class SchedulerAgent(BaseAgent):
                     debate_input = {"query_id": qid, "original_query": query, "ranked_cases": ranked_cases}
                     debate_result = await debater.execute(debate_input)
                     trace["debate"] = {"agent_name": "debate", "status": "complete", "details": {"rounds": len(debate_result.get("debate_rounds", [])), "disputes": len(debate_result.get("disagreement_flags", []))}}
+                    if "trace_callback" in input_data: await input_data["trace_callback"](trace)
 
                     # Re-order based on debate final ranking
                     final_ranking = debate_result.get("final_ranking", [])
@@ -88,6 +91,7 @@ class SchedulerAgent(BaseAgent):
                 eval_input = {"query_id": qid, "ranked_cases": ranked_cases, "extracted_issues": plan_result.get("extracted_issues", []), "debate_result": debate_result}
                 eval_result = await evaluator.execute(eval_input)
                 trace["evaluator"] = {"agent_name": "evaluator", "status": "complete", "details": {"precision_at_5": eval_result.get("precision_at_5"), "ndcg_at_10": eval_result.get("ndcg_at_10"), "mrr": eval_result.get("mrr"), "confidence": eval_result.get("confidence")}}
+                if "trace_callback" in input_data: await input_data["trace_callback"](trace)
 
                 best_result = {"ranked_cases": ranked_cases}
                 best_eval = eval_result
@@ -104,6 +108,7 @@ class SchedulerAgent(BaseAgent):
 
             elapsed_ms = int((time.monotonic() - pipeline_start) * 1000)
             trace["scheduler"] = {"agent_name": "scheduler", "status": "complete", "details": {"iterations": iteration, "final_confidence": best_eval.get("confidence", 0)}}
+            if "trace_callback" in input_data: await input_data["trace_callback"](trace)
 
             # Compute final scores
             results = []

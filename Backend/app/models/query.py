@@ -103,6 +103,7 @@ class QueryStatusResponse(BaseModel):
     processing_time_ms: int | None = None
     created_at: str
     completed_at: str | None = None
+    agent_trace: AgentTrace | None = None
 
 
 class CaseDetailResponse(BaseModel):
