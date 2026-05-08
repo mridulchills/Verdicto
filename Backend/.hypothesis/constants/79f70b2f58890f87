@@ -1,0 +1,4 @@
+# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\core\faiss_index.py
+# hypothesis_version: 6.131.15
+
+['case_id', 'faiss.index_loaded', 'faiss.mapping_loaded', 'faiss_rank', 'faiss_score', 'r', 'utf-8']

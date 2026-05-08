@@ -112,6 +112,32 @@ export async function getSimilarCases(caseId, topK = 10) {
   return request(`/cases/${caseId}/similar?top_k=${topK}`);
 }
 
+/**
+ * Extract text from an uploaded document (PDF/TXT).
+ * @param {File} file 
+ * @returns {Promise<{ filename: string, text: string }>}
+ */
+export async function extractFileText(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const response = await fetch(`${API_BASE}/cases/extract`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'File extraction failed');
+    }
+    return await response.json();
+  } catch (error) {
+    throw new Error(error.message || 'Network error during extraction');
+  }
+}
+
+
 // ── System Endpoints ───────────────────────────────────────────────────
 
 /**

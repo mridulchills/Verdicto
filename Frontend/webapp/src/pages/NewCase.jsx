@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, CheckCircle2, Zap, Play, Trash2, File as FileIcon, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { queryLegalCases } from '../lib/apiClient';
+import { queryLegalCases, extractFileText } from '../lib/apiClient';
 
 const NewCasePage = () => {
   const navigate = useNavigate();
@@ -26,16 +26,20 @@ const NewCasePage = () => {
       setFiles([...files, ...newFiles]);
       setUploadStatus('scanning');
       
-      // Simulate file reading and extraction
-      // In a real app, we'd send these to an OCR/Extraction endpoint
-      setTimeout(() => {
+      // Real file reading and extraction using backend endpoint
+      try {
+        const result = await extractFileText(selectedFiles[0]);
         setUploadStatus('complete');
         setExtractedFacts(true);
-        // We don't hardcode the text anymore, user can type it or we could extract it from file
-        if (!queryText && selectedFiles.length > 0) {
-           setQueryText(`Analysis request for uploaded document: ${selectedFiles[0].name}. \n\nPlease perform a comprehensive legal research on the issues mentioned in the attached case file.`);
+        if (!queryText) {
+          const truncatedText = result.text.length > 3000 ? result.text.substring(0, 3000) + '... (truncated)' : result.text;
+          setQueryText(`Analysis request for uploaded document: ${selectedFiles[0].name}.\n\nExtracted Facts:\n${truncatedText}\n\nPlease perform a comprehensive legal research on the issues mentioned above.`);
         }
-      }, 1500);
+      } catch (err) {
+        console.error("Extraction error:", err);
+        setUploadStatus('idle');
+        setSubmitError(err.message || "Failed to extract text from document");
+      }
     }
   };
 
@@ -204,6 +208,9 @@ const NewCasePage = () => {
            style={{ margin: 0, padding: '1.25rem', fontSize: '1.125rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', opacity: (extractedFacts && !isSubmitting) ? 1 : 0.5, cursor: (extractedFacts && !isSubmitting) ? 'pointer' : 'not-allowed' }}
            onClick={() => {
              if (!extractedFacts || isSubmitting) return;
+             // Clear any stale active query so ProgressDashboard starts fresh
+             localStorage.removeItem('verdicto_active_query');
+             localStorage.removeItem('verdicto_active_query_text');
              navigate('/progress', { state: { queryText } });
            }}
         >

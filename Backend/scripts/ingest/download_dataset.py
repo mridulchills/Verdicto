@@ -110,7 +110,7 @@ def download_and_extract_tar(year: int, output_dir: Path) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download SC judgment metadata from S3")
-    parser.add_argument("--year-from", type=int, default=2020, help="Start year (inclusive)")
+    parser.add_argument("--year-from", type=int, default=2024, help="Start year (inclusive)")
     parser.add_argument("--year-to", type=int, default=2024, help="End year (inclusive)")
     parser.add_argument("--output-dir", type=str, default="./data/raw", help="Output directory")
     parser.add_argument("--skip-pdfs", action="store_true", help="Skip downloading bulk PDFs")

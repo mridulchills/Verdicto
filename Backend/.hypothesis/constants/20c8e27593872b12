@@ -1,0 +1,4 @@
+# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\agents\debate.py
+# hypothesis_version: 6.131.15
+
+[0.1, 0.3, 0.5, 50.0, 100, 150, 250, 350, 400, 500, '<think>.*?</think>', '?', '\\{.*\\}', '```', 'advocate', 'advocate_opposing', 'case_id', 'confidence', 'consensus_rationale', 'counterargument', 'debate', 'debate.advocate_ok', 'debate.complete', 'debate.opposing_ok', 'debate.start', 'debate.synthesis_ok', 'debate_rounds', 'disagreement_flags', 'disputes', 'entries', 'facts_text', 'final_ranking', 'flash', 'issues_text', 'key_principles', 'opposing', 'original_query', 'outcome_text', 'overruled_by', 'query_id', 'ranked_cases', 'rationale', 'reasoning_text', 'relevance_argument', 'result', 'round_number', 'synthesis', 'title', 'type', 'weaknesses', 'year']

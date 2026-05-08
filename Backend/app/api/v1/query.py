@@ -97,8 +97,8 @@ async def get_query(query_id: str, db: AsyncSession = Depends(get_db)) -> QueryR
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail={"error": {"code": "QUERY_NOT_FOUND", "message": f"Query {query_id} not found", "query_id": query_id}})
-    if record.status != "complete":
-        raise HTTPException(status_code=400, detail={"error": {"code": "QUERY_NOT_COMPLETE", "message": f"Query {query_id} is not complete", "query_id": query_id}})
+    if record.status not in ("complete",):
+        raise HTTPException(status_code=400, detail={"error": {"code": "QUERY_NOT_COMPLETE", "message": f"Query {query_id} is not complete (status: {record.status})", "query_id": query_id}})
         
     results_data = json.loads(record.result) if record.result else []
     trace_data = json.loads(record.agent_trace) if record.agent_trace else {}

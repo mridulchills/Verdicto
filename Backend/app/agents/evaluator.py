@@ -39,11 +39,11 @@ class EvaluatorAgent(BaseAgent):
         query_issues = input_data.get("extracted_issues", [])
         debate_result = input_data.get("debate_result", {})
 
-        # Use authority_score as relevance proxy
-        scores = [c.get("authority_score", 0.0) for c in ranked_cases]
+        # Use final_score as relevance proxy, fall back to authority_score
+        scores = [c.get("final_score", c.get("authority_score", 0.0)) for c in ranked_cases]
 
         # P@K: fraction of top-K results above threshold
-        threshold = 0.5
+        threshold = 0.4
         p_at_5 = sum(1 for s in scores[:5] if s >= threshold) / min(5, len(scores)) if scores else 0.0
         p_at_10 = sum(1 for s in scores[:10] if s >= threshold) / min(10, len(scores)) if scores else 0.0
 
@@ -67,13 +67,14 @@ class EvaluatorAgent(BaseAgent):
             matched = sum(1 for issue in query_issues if issue.lower()[:20] in all_case_text)
             coverage = matched / len(query_issues)
 
-        # Overall confidence
-        confidence = (p_at_5 * 0.3 + ndcg_10 * 0.3 + mrr * 0.2 + coverage * 0.2)
+        # Overall confidence — round before threshold comparison to avoid
+        # floating-point edge cases where 0.6499999... < 0.65 but rounds to 0.65
+        confidence_rounded = round(p_at_5 * 0.3 + ndcg_10 * 0.3 + mrr * 0.2 + coverage * 0.2, 4)
 
         # Check debate disagreement
         disagreements = debate_result.get("disagreement_flags", [])
         disagreement_rate = len(disagreements) / max(len(ranked_cases[:5]), 1)
-        needs_refinement = confidence < settings.confidence_threshold or disagreement_rate > 0.3
+        needs_refinement = confidence_rounded < settings.confidence_threshold or disagreement_rate > 0.3
 
         return {
             "query_id": qid,
@@ -82,7 +83,7 @@ class EvaluatorAgent(BaseAgent):
             "ndcg_at_10": round(ndcg_10, 4),
             "mrr": round(mrr, 4),
             "coverage": round(coverage, 4),
-            "confidence": round(confidence, 4),
+            "confidence": confidence_rounded,
             "needs_refinement": needs_refinement,
             "disagreement_rate": round(disagreement_rate, 4),
         }
