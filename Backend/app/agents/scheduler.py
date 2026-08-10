@@ -53,6 +53,11 @@ class SchedulerAgent(BaseAgent):
         from app.core.gemini_client import get_gemini_client as _get_client
         _get_client().reset_circuit()
 
+        # Snapshot token usage so the trace can record THIS query's cost.
+        # The client is a process-wide singleton, so its counters are cumulative —
+        # we record the delta rather than the running total (Q37).
+        _usage_baseline = dict(_get_client().get_usage_stats())
+
         async def _callback():
             if "trace_callback" in input_data:
                 await input_data["trace_callback"](trace)
@@ -271,6 +276,12 @@ class SchedulerAgent(BaseAgent):
                     "final_confidence": best_eval.get("confidence", 0),
                     "total_pipeline_ms": elapsed_ms,
                     "debate_enabled": enable_debate,
+                    # Per-query LLM cost, as a delta against the pipeline-start snapshot.
+                    # Read back by scripts/eval/trace_stats.py (Q37).
+                    "token_usage": {
+                        k: _get_client().get_usage_stats().get(k, 0) - _usage_baseline.get(k, 0)
+                        for k in ("total_prompt_tokens", "total_completion_tokens", "total_calls")
+                    },
                 },
             }
             await _callback()

@@ -52,23 +52,30 @@ def extract_with_pypdf(pdf_path: Path) -> str | None:
         return None
 
 
-def extract_text(pdf_path: Path) -> str | None:
-    """Extract text from a PDF using pdfplumber, falling back to pypdf."""
+def extract_text(pdf_path: Path) -> tuple[str | None, str]:
+    """
+    Extract text from a PDF using pdfplumber, falling back to pypdf.
+    Returns (text, method) where method records HOW the document was handled —
+    needed for the corpus-construction attrition table (Q46), which previously
+    only existed as console output that scrolled past.
+    """
     text = extract_with_pdfplumber(pdf_path)
     if text:
-        return text
+        return text, "pdfplumber"
     logger.info(f"Falling back to pypdf for {pdf_path.name}")
     text = extract_with_pypdf(pdf_path)
     if text:
-        return text
+        return text, "pypdf_fallback"
     logger.warning(f"SKIP (scanned/corrupted): {pdf_path.name}")
-    return None
+    return None, "failed_scanned_or_corrupt"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract text from PDF judgments")
     parser.add_argument("--input-dir", type=str, default="./data/raw/pdfs", help="Directory containing PDFs")
     parser.add_argument("--output-dir", type=str, default="./data/processed", help="Output directory for .txt files")
+    parser.add_argument("--data-dir", type=str, default="../data",
+                        help="Root data directory; reports are written to <data-dir>/reports/")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -79,30 +86,78 @@ def main() -> None:
         logger.error(f"Input directory {input_dir} does not exist")
         return
 
+    # Reporting is imported lazily so the script still runs standalone if the
+    # scripts package is not on the path.
+    try:
+        from scripts.lib.report import EventLog, Report
+        report_enabled = True
+    except Exception:
+        report_enabled = False
+        logger.warning("scripts.lib.report unavailable — running without file reporting")
+
     pdf_files = sorted(input_dir.rglob("*.pdf"))
     logger.info(f"Found {len(pdf_files)} PDFs to process")
 
+    from collections import Counter
+    methods: Counter[str] = Counter()
+    char_lengths: list[int] = []
     extracted = 0
-    skipped = 0
+    skipped_existing = 0
+    failed = 0
+
+    log = EventLog("extract_text_per_doc", args.data_dir) if report_enabled else None
+
     for pdf_path in pdf_files:
         relative = pdf_path.relative_to(input_dir)
         output_path = output_dir / relative.with_suffix(".txt")
 
         if output_path.exists():
             logger.debug(f"SKIP (exists): {output_path.name}")
-            skipped += 1
+            skipped_existing += 1
+            methods["skipped_already_extracted"] += 1
             continue
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        text = extract_text(pdf_path)
+        text, method = extract_text(pdf_path)
+        methods[method] += 1
+
         if text:
             output_path.write_text(text, encoding="utf-8")
             extracted += 1
+            char_lengths.append(len(text))
             logger.info(f"Extracted: {pdf_path.name} ({len(text)} chars)")
+            if log:
+                log.write(case_id=output_path.stem, status="ok", method=method, chars=len(text))
         else:
-            skipped += 1
+            failed += 1
+            if log:
+                log.write(case_id=output_path.stem, status="failed", method=method, chars=0)
 
-    logger.info(f"Done. Extracted: {extracted}, Skipped: {skipped}")
+    if log:
+        log.close()
+
+    logger.info(f"Done. Extracted: {extracted}, Failed: {failed}, Already present: {skipped_existing}")
+
+    if report_enabled:
+        import statistics as _st
+        rep = Report("extract_text", args.data_dir, args)
+        rep.section("PDF text extraction (Q46)")
+        rep.stat("pdfs_found", len(pdf_files))
+        rep.stat("extracted_this_run", extracted)
+        rep.stat("failed", failed)
+        rep.stat("already_present", skipped_existing)
+        rep.stat("failure_rate_pct",
+                 round(100 * failed / max(extracted + failed, 1), 2),
+                 "share of newly attempted PDFs that yielded no usable text")
+        rep.table("Extraction method", ["method", "documents"],
+                  [[k, v] for k, v in methods.most_common()])
+        if char_lengths:
+            rep.stat("chars_mean", round(_st.mean(char_lengths), 1))
+            rep.stat("chars_median", round(_st.median(char_lengths), 1))
+        rep.note("Failures are scanned/image-only PDFs (<100 chars of text), encrypted "
+                 "files, and corrupt files. Per-document outcomes: "
+                 "reports/extract_text_per_doc.jsonl")
+        rep.save()
 
 
 if __name__ == "__main__":
