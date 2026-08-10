@@ -1,0 +1,4 @@
+# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\agents\retriever.py
+# hypothesis_version: 6.131.15
+
+[0.0, 1.0, ' | ', 'AND year <= :year_to', '\\b[a-zA-Z]{4,}\\b', 'after_rrf', 'also', 'and', 'been', 'bm25_hits', 'bm25_score', 'candidates', 'case', 'case_id', 'court', 'faiss_hits', 'faiss_score', 'filters', 'for', 'from', 'have', 'high', 'india', 'indian', 'into', 'original_query', 'query_id', 'reformulated_queries', 'retriever', 'rrf_score', 'such', 'supreme', 'that', 'the', 'their', 'they', 'this', 'top_k', 'tsquery', 'under', 'upon', 'were', 'what', 'when', 'where', 'which', 'with', 'year_from', 'year_to']

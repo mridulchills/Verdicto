@@ -102,7 +102,7 @@ const Profile = () => {
               <div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '1rem 0', borderBottom: '1px solid var(--outline-variant-ghost)' }}>
                   <div>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, display: 'block', color: 'var(--on-surface)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--on-surface)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Eye size={14} style={{ color: 'var(--secondary)' }}/> Advanced Features Visiblity
                     </span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>Show scheduler logic and debate explorers in UI</span>
@@ -114,7 +114,7 @@ const Profile = () => {
 
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '1rem 0', opacity: 0.6 }}>
                   <div>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, display: 'block', color: 'var(--on-surface)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--on-surface)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Lock size={14} style={{ color: 'var(--tertiary)' }}/> API Access (Integration)
                     </span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--on-surface-variant)' }}>Generate keys for external client integration</span>

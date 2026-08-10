@@ -5,7 +5,9 @@ GET /api/v1/cases/{case_id}/similar — Similar cases.
 from __future__ import annotations
 from typing import Any
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+import io
+import pypdf
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -69,3 +71,25 @@ async def get_similar_cases(case_id: str, top_k: int = 10, db: AsyncSession = De
             similarity_score=round(r["faiss_score"], 4), bench=cases.get(r["case_id"], Case).bench if r["case_id"] in cases else None)
         for r in results
     ]
+
+@router.post("/cases/extract")
+async def extract_text_from_file(file: UploadFile = File(...)):
+    """Extract text from an uploaded document (PDF or TXT)."""
+    try:
+        content = await file.read()
+        extracted_text = ""
+        
+        if file.filename.lower().endswith(".pdf"):
+            reader = pypdf.PdfReader(io.BytesIO(content))
+            for page in reader.pages:
+                extracted_text += page.extract_text() + "\n"
+        else:
+            extracted_text = content.decode("utf-8")
+            
+        if not extracted_text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from the file. File may be empty or an image-based PDF.")
+            
+        return {"filename": file.filename, "text": extracted_text.strip()}
+    except Exception as e:
+        logger.error("file_extraction_failed", error=str(e), filename=file.filename)
+        raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")

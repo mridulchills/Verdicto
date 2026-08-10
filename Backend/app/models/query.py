@@ -61,6 +61,12 @@ class CaseResult(BaseModel):
     explanation: str = ""
     debate_notes: str = ""
     acts_sections: list[str] = Field(default_factory=list)
+    # Rich per-case fields populated by the scheduler
+    ratio_decidendi: str = ""
+    relief: str = ""
+    precedent_issues: list[str] = Field(default_factory=list)
+    relevance_argument: str = ""
+    weakness: str = ""
 
 
 class AgentTraceEntry(BaseModel):

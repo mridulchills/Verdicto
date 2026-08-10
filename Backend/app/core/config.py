@@ -22,8 +22,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── Required ──────────────────────────────────────────────────────────
-    gemini_api_key: str
+    # ── Required (dummy default — Ollama is used instead of Gemini) ──────
+    gemini_api_key: str = "not_used_ollama_is_active"
 
     # ── Database ──────────────────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://verdicto:verdicto_secret@localhost:5432/verdicto"
@@ -62,12 +62,16 @@ class Settings(BaseSettings):
     # ── Agent Configuration ───────────────────────────────────────────────
     debate_max_rounds: int = 3
     scheduler_max_iterations: int = 3
-    confidence_threshold: float = 0.75
+    confidence_threshold: float = 0.55
 
     # ── Gemini Models & Rate Limits ───────────────────────────────────────
     gemini_rate_limit_rpm: int = 60
     gemini_model_flash: str = "gemini-2.0-flash"
     gemini_model_pro: str = "gemini-2.5-pro"
+    
+    # ── Ollama Models (Local Fallback/Override) ───────────────────────────
+    ollama_model: str = "deepseek-r1:8b"
+    ollama_url: str = "http://host.docker.internal:11434"
     
     # ── Embedding Models ──────────────────────────────────────────────────
     use_local_embeddings: bool = True
@@ -79,6 +83,12 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
 
-def get_settings() -> Settings:
-    """Singleton-like factory for settings. Raises immediately if config is invalid."""
-    return Settings()  # type: ignore[call-arg]
+_settings: "Settings | None" = None
+
+
+def get_settings() -> "Settings":
+    """Singleton factory for settings. Raises immediately if config is invalid."""
+    global _settings
+    if _settings is None:
+        _settings = Settings()  # type: ignore[call-arg]
+    return _settings

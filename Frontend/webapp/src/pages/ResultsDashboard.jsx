@@ -64,43 +64,70 @@ const ResultsDashboard = () => {
       jurisdiction: 'Supreme Court of India',
       judges: r.bench || '—',
       outcome: r.disposal_nature || '—',
-      relief: r.snippet || '',
-      stars: Math.round(r.authority_score * 5),
+      // Use the dedicated rich fields from the backend
+      relief: r.relief || r.snippet || '',
+      stars: Math.min(5, Math.max(1, Math.round(r.authority_score * 5))),
       strength: r.authority_score > 0.7 ? 'Binding' : 'Persuasive',
       recommendation: r.relevance_score > 0.7 ? 'Highly Applicable' : 'Partially Applicable',
-      ratioDecidendi: r.explanation || r.snippet || '',
-      obiterDicta: r.debate_notes || '',
-      precedentFacts: [],
-      factsComparison: { matching: r.matched_issues || [], missing: [], contradicting: [] },
-      precedentIssues: r.matched_issues || [],
-      issuesComparison: { matching: r.matched_issues || [], additional: [] },
-      differences: '',
-      cites: [],
+      // ratio_decidendi is the per-case reasoning text from the backend
+      ratioDecidendi: r.ratio_decidendi || r.explanation || r.snippet || '',
+      obiterDicta: r.debate_notes || r.weakness || '',
+      precedentFacts: r.snippet ? [r.snippet] : [],
+      factsComparison: {
+        matching: r.matched_issues || [],
+        missing: [],
+        contradicting: [],
+      },
+      // precedent_issues are extracted from the case's issues_text
+      precedentIssues: r.precedent_issues || r.matched_issues || [],
+      issuesComparison: {
+        matching: r.matched_issues || [],
+        additional: [],
+      },
+      // differences: use relevance_argument vs weakness for advocate/opposing view
+      differences: r.relevance_argument
+        ? `Relevance: ${r.relevance_argument}${r.weakness ? `\n\nPotential weakness: ${r.weakness}` : ''}`
+        : '',
+      cites: r.acts_sections || [],
       citedBy: 0,
       desc: r.snippet || r.explanation || '',
       metrics: [
         Math.round(r.relevance_score * 100),
         Math.round(r.authority_score * 100),
         Math.round(r.final_score * 100),
-        Math.round(r.relevance_score * 80),
+        Math.round((r.relevance_score + r.authority_score) / 2 * 100),
       ],
     }));
-  }, [apiResult]);
-
-  // Show a banner if we have live data
+  }, [activeResult]);
   const isLiveData = !!apiPrecedents;
 
-  const inputCaseFacts = [
-    "The Petitioner and Respondent entered into a Sub-Contract.",
-    "The sub-contract contains an arbitration clause (Clause 32).",
-    "The overarching Sub-Contract is completely unstamped.",
-    "Petitioner invoked Section 11 of the Arbitration & Conciliation Act."
-  ];
+  // Input case facts/issues: use live data when available, else demo fallback
+  const inputCaseFacts = useMemo(() => {
+    if (isLiveData && queryText) {
+      // Split the query into sentences as "facts"
+      return queryText
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 10)
+        .slice(0, 6);
+    }
+    return [
+      "The Petitioner and Respondent entered into a Sub-Contract.",
+      "The sub-contract contains an arbitration clause (Clause 32).",
+      "The overarching Sub-Contract is completely unstamped.",
+      "Petitioner invoked Section 11 of the Arbitration & Conciliation Act.",
+    ];
+  }, [isLiveData, queryText]);
 
-  const inputCaseIssues = [
-    "Does the non-stamping of the main commercial agreement render the embedded arbitration agreement invalid?",
-    "Should the Section 11 court impound the document or leave it to the arbitral tribunal?"
-  ];
+  const inputCaseIssues = useMemo(() => {
+    if (isLiveData && activeResult?.results?.[0]?.matched_issues?.length) {
+      return activeResult.results[0].matched_issues;
+    }
+    return [
+      "Does the non-stamping of the main commercial agreement render the embedded arbitration agreement invalid?",
+      "Should the Section 11 court impound the document or leave it to the arbitral tribunal?",
+    ];
+  }, [isLiveData, activeResult]);
 
   const precedentData = [
     {

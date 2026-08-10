@@ -1,0 +1,4 @@
+# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\models\case.py
+# hypothesis_version: 6.131.15
+
+[100, 200, 'Case', 'Citation', 'cases', 'cases.case_id', 'citations', 'cited_by', 'cited_case', 'citing', 'citing_case', 'idx_cases_year', 'pending', 'query_records', 'selectin', 'year']

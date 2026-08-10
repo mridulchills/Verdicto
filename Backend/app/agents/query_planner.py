@@ -72,8 +72,26 @@ class QueryPlannerAgent(BaseAgent):
                 temperature=0.1,
             )
 
+            # Clean the response of potential markdown formatting and think blocks
+            cleaned_response = raw_response.strip()
+            # Strip <think>...</think> blocks (deepseek-r1 reasoning traces)
+            import re as _re
+            cleaned_response = _re.sub(r"<think>.*?</think>", "", cleaned_response, flags=_re.DOTALL).strip()
+            if cleaned_response.startswith("```"):
+                import re
+                match = re.search(r"```(?:json)?\n?(.*?)\n?```", cleaned_response, re.DOTALL)
+                if match:
+                    cleaned_response = match.group(1)
+            # Try to find JSON object if not clean JSON
+            if not cleaned_response.startswith("{"):
+                import re
+                match = re.search(r"\{.*\}", cleaned_response, re.DOTALL)
+                if match:
+                    cleaned_response = match.group(0)
+            
             # Parse the JSON response
-            parsed = json.loads(raw_response)
+            parsed = json.loads(cleaned_response)
+
 
             return {
                 "query_id": query_id,

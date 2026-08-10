@@ -83,23 +83,59 @@ class RetrieverAgent(BaseAgent):
         results = faiss_idx.search(query_embedding, top_k=top_k)
         return results
 
+    @staticmethod
+    def _build_or_tsquery(query_text: str) -> str:
+        """
+        Convert a natural language query into a PostgreSQL OR-based tsquery.
+        Extracts meaningful words (length >= 4) and joins with | (OR).
+        This gives much better recall than plainto_tsquery (AND logic).
+        """
+        import re
+        # Remove common stop words and short words
+        stop_words = {
+            "the", "and", "for", "that", "this", "with", "from", "have",
+            "been", "were", "they", "their", "what", "when", "where", "which",
+            "under", "into", "upon", "also", "such", "case", "court", "high",
+            "supreme", "india", "indian",
+        }
+        # Extract words, filter stop words and short words
+        words = re.findall(r'\b[a-zA-Z]{4,}\b', query_text.lower())
+        keywords = [w for w in words if w not in stop_words]
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        unique = []
+        for w in keywords:
+            if w not in seen:
+                seen.add(w)
+                unique.append(w)
+        # Use top 8 keywords max to avoid overly complex queries
+        return " | ".join(unique[:8]) if unique else query_text
+
     async def _bm25_search(
         self,
         query_text: str,
         top_k: int,
         filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform BM25 search via PostgreSQL tsvector (parameterized queries only)."""
+        """
+        Perform BM25 search via PostgreSQL tsvector.
+        Uses OR-based tsquery for better recall than plainto_tsquery (AND logic).
+        """
         if self._db_session is None:
             logger.warning("retriever.no_db_session_for_bm25")
+            return []
+
+        # Build OR-based tsquery for better recall
+        or_query = self._build_or_tsquery(query_text)
+        if not or_query:
             return []
 
         # Build the SQL query with optional year filters
         sql = text("""
             SELECT case_id,
-                   ts_rank(text_search_vector, plainto_tsquery('english', :query)) AS bm25_score
+                   ts_rank(text_search_vector, to_tsquery('english', :tsquery)) AS bm25_score
             FROM cases
-            WHERE text_search_vector @@ plainto_tsquery('english', :query)
+            WHERE text_search_vector @@ to_tsquery('english', :tsquery)
             {year_filter}
             ORDER BY bm25_score DESC
             LIMIT :top_k
@@ -107,7 +143,7 @@ class RetrieverAgent(BaseAgent):
             year_filter=self._build_year_filter(filters)
         ))
 
-        params: dict[str, Any] = {"query": query_text, "top_k": top_k}
+        params: dict[str, Any] = {"tsquery": or_query, "top_k": top_k}
         if filters:
             if filters.get("year_from"):
                 params["year_from"] = filters["year_from"]
@@ -117,12 +153,17 @@ class RetrieverAgent(BaseAgent):
         try:
             result = await self._db_session.execute(sql, params)
             rows = result.fetchall()
+            logger.info(
+                "retriever.bm25_complete",
+                tsquery=or_query,
+                hits=len(rows),
+            )
             return [
                 {"case_id": row[0], "bm25_score": float(row[1])}
                 for row in rows
             ]
         except Exception as e:
-            logger.error("retriever.bm25_failed", error=str(e))
+            logger.error("retriever.bm25_failed", error=str(e), tsquery=or_query)
             return []
 
     @staticmethod
@@ -155,16 +196,21 @@ class RetrieverAgent(BaseAgent):
         reformulated = input_data.get("reformulated_queries", [])
         filters = input_data.get("filters", {})
 
-        # Use original query + first reformulation for broader coverage
+        # FAISS: use combined query for broader semantic coverage
         search_queries = [original_query] + reformulated[:1]
         combined_query = " ".join(search_queries)
+
+        # BM25: use only the original query — combined queries are too long for tsvector matching
+        bm25_query = original_query
 
         top_k = settings.max_query_k
 
         try:
-            # Run FAISS and BM25 in parallel conceptually (sequential here for simplicity)
-            faiss_results = await self._faiss_search(combined_query, top_k)
-            bm25_results = await self._bm25_search(combined_query, top_k, filters)
+            # Run FAISS and BM25 concurrently
+            import asyncio as _asyncio
+            faiss_task = _asyncio.create_task(self._faiss_search(combined_query, top_k))
+            bm25_task = _asyncio.create_task(self._bm25_search(bm25_query, top_k, filters))
+            faiss_results, bm25_results = await _asyncio.gather(faiss_task, bm25_task)
 
             # Merge with RRF
             merged = merge_rankings(faiss_results, bm25_results)

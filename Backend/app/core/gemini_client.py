@@ -1,16 +1,16 @@
 """
-Centralized Gemini API client.
-This is the ONLY place where google.generativeai is imported.
-All agents call this client — never the SDK directly.
+Centralized Client for Ollama (Replacing Gemini).
+All agents call this client.
 """
 
 from __future__ import annotations
 
 import asyncio
 import time
+import json
+import httpx
 from typing import Any, TypeVar
 
-import google.generativeai as genai
 import structlog
 from pydantic import BaseModel
 from tenacity import (
@@ -31,6 +31,18 @@ logger = structlog.get_logger()
 T = TypeVar("T", bound=BaseModel)
 
 settings = get_settings()
+
+# Shared persistent httpx client — avoids per-call connection overhead
+# and allows connection reuse across concurrent debate calls.
+_http_client: httpx.AsyncClient | None = None
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        # No timeout here — callers use asyncio.wait_for for deadline control
+        _http_client = httpx.AsyncClient(timeout=None)
+    return _http_client
 
 
 class _UsageStats:
@@ -56,26 +68,22 @@ class _UsageStats:
 
 class GeminiClient:
     """
-    Centralized wrapper around the Google Generative AI SDK.
+    Centralized wrapper around Ollama (API compatible with original GeminiClient).
     Features:
-    - Retry with exponential backoff (max 3 retries)
+    - Retry with exponential backoff on API errors only (not timeouts/cancellations)
     - Circuit breaker (3 consecutive failures → open)
     - Token usage tracking
     """
 
     def __init__(self) -> None:
-        genai.configure(api_key=settings.gemini_api_key)
         self._usage = _UsageStats()
         self._consecutive_failures: int = 0
         self._circuit_open: bool = False
-        self._flash_model = genai.GenerativeModel(settings.gemini_model_flash)
-        self._pro_model = genai.GenerativeModel(settings.gemini_model_pro)
-        self._embedding_model_name = settings.gemini_embedding_model
 
     def _check_circuit(self) -> None:
         if self._circuit_open:
             raise GeminiCircuitOpenError(
-                "Gemini circuit breaker is open after 3 consecutive failures. "
+                "Circuit breaker is open after 3 consecutive failures. "
                 "Skipping to fallback."
             )
 
@@ -88,7 +96,7 @@ class GeminiClient:
         if self._consecutive_failures >= 3:
             self._circuit_open = True
             logger.error(
-                "gemini.circuit_open",
+                "ollama.circuit_open",
                 consecutive_failures=self._consecutive_failures,
             )
 
@@ -100,10 +108,11 @@ class GeminiClient:
         self._circuit_open = False
         self._consecutive_failures = 0
 
+    # Only retry on GeminiAPIError — never on TimeoutError or CancelledError
     @retry(
-        retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(GeminiAPIError),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=2, max=8),
         reraise=True,
     )
     async def generate_text(
@@ -115,81 +124,99 @@ class GeminiClient:
         temperature: float = 0.2,
     ) -> str:
         """
-        Generate text from Gemini. Returns parsed text response.
-
-        Args:
-            prompt: The prompt string.
-            model: "flash" or "pro".
-            response_schema: Optional JSON schema for structured output.
-            temperature: Sampling temperature.
+        Generate text from Ollama. Returns parsed text response.
+        Callers should wrap with asyncio.wait_for() for deadline control.
         """
         self._check_circuit()
-        log = logger.bind(model=model, prompt_len=len(prompt))
-        log.info("gemini.generate_text.start")
+        log = logger.bind(model=settings.ollama_model, prompt_len=len(prompt))
+        log.info("ollama.generate_text.start")
 
         start = time.monotonic()
         try:
-            genai_model = self._pro_model if model == "pro" else self._flash_model
-
-            generation_config: dict[str, Any] = {"temperature": temperature}
+            payload = {
+                "model": settings.ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": 1024,   # cap output tokens — prevents runaway generation
+                },
+            }
             if response_schema is not None:
-                generation_config["response_mime_type"] = "application/json"
-                generation_config["response_schema"] = response_schema
+                payload["format"] = "json"
 
-            response = await asyncio.to_thread(
-                genai_model.generate_content,
-                prompt,
-                generation_config=genai.GenerationConfig(**generation_config),
+            http = _get_http_client()
+            response = await http.post(
+                f"{settings.ollama_url}/api/generate",
+                json=payload,
             )
+            response.raise_for_status()
+            result = response.json()
 
-            # Extract usage metadata
-            if hasattr(response, "usage_metadata") and response.usage_metadata:
-                self._usage.record(
-                    prompt_tokens=getattr(response.usage_metadata, "prompt_token_count", 0),
-                    completion_tokens=getattr(response.usage_metadata, "candidates_token_count", 0),
-                )
+            result_text = result.get("response", "")
 
-            result_text = response.text
+            # Strip <think>...</think> blocks (deepseek-r1 reasoning traces)
+            import re as _re
+            result_text = _re.sub(r"<think>.*?</think>", "", result_text, flags=_re.DOTALL).strip()
+
+            # Extract usage
+            eval_count = result.get("eval_count", 0)
+            prompt_eval_count = result.get("prompt_eval_count", 0)
+            self._usage.record(prompt_tokens=prompt_eval_count, completion_tokens=eval_count)
+
             elapsed = (time.monotonic() - start) * 1000
-            log.info("gemini.generate_text.complete", latency_ms=round(elapsed, 2), output_len=len(result_text))
+            log.info(
+                "ollama.generate_text.complete",
+                latency_ms=round(elapsed, 2),
+                output_len=len(result_text),
+            )
 
             self._record_success()
             return result_text
 
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            # Never retry on cancellation/timeout — propagate immediately
+            elapsed = (time.monotonic() - start) * 1000
+            log.warning("ollama.generate_text.cancelled", latency_ms=round(elapsed, 2))
+            raise
+
         except Exception as exc:
             elapsed = (time.monotonic() - start) * 1000
             self._record_failure()
-            log.error("gemini.generate_text.failed", error=str(exc), latency_ms=round(elapsed, 2))
-            raise GeminiAPIError(f"Gemini text generation failed: {exc}") from exc
+            log.error("ollama.generate_text.failed", error=str(exc), latency_ms=round(elapsed, 2))
+            raise GeminiAPIError(f"Ollama text generation failed: {exc}") from exc
 
+    # Only retry on EmbeddingError — never on TimeoutError or CancelledError
     @retry(
-        retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(EmbeddingError),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=2, max=8),
         reraise=True,
     )
     async def generate_embedding(self, text: str) -> list[float]:
-        """
-        Generate an embedding vector for the given text using Gemini Embedding API.
-        Returns a list of floats (the embedding vector).
-        """
+        """Generate an embedding vector for the given text using Ollama."""
         self._check_circuit()
         log = logger.bind(text_len=len(text))
-        log.info("gemini.generate_embedding.start")
+        log.info("ollama.generate_embedding.start")
 
         start = time.monotonic()
         try:
-            result = await asyncio.to_thread(
-                genai.embed_content,
-                model=f"models/{self._embedding_model_name}",
-                content=text,
-                task_type="retrieval_document",
+            payload = {
+                "model": "nomic-embed-text:latest",
+                "prompt": text,
+            }
+            http = _get_http_client()
+            response = await http.post(
+                f"{settings.ollama_url}/api/embeddings",
+                json=payload,
             )
+            response.raise_for_status()
+            result = response.json()
 
-            embedding: list[float] = result["embedding"]
+            embedding: list[float] = result.get("embedding", [])
             elapsed = (time.monotonic() - start) * 1000
             log.info(
-                "gemini.generate_embedding.complete",
+                "ollama.generate_embedding.complete",
                 latency_ms=round(elapsed, 2),
                 dim=len(embedding),
             )
@@ -197,42 +224,18 @@ class GeminiClient:
             self._record_success()
             return embedding
 
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            raise
+
         except Exception as exc:
             elapsed = (time.monotonic() - start) * 1000
             self._record_failure()
-            log.error("gemini.generate_embedding.failed", error=str(exc), latency_ms=round(elapsed, 2))
-            raise EmbeddingError(f"Embedding generation failed: {exc}") from exc
+            log.error("ollama.generate_embedding.failed", error=str(exc), latency_ms=round(elapsed, 2))
+            raise EmbeddingError(f"Ollama Embedding generation failed: {exc}") from exc
 
     async def generate_query_embedding(self, text: str) -> list[float]:
         """Generate an embedding optimized for query retrieval."""
-        self._check_circuit()
-        log = logger.bind(text_len=len(text))
-
-        start = time.monotonic()
-        try:
-            result = await asyncio.to_thread(
-                genai.embed_content,
-                model=f"models/{self._embedding_model_name}",
-                content=text,
-                task_type="retrieval_query",
-            )
-
-            embedding: list[float] = result["embedding"]
-            elapsed = (time.monotonic() - start) * 1000
-            log.info(
-                "gemini.generate_query_embedding.complete",
-                latency_ms=round(elapsed, 2),
-                dim=len(embedding),
-            )
-
-            self._record_success()
-            return embedding
-
-        except Exception as exc:
-            elapsed = (time.monotonic() - start) * 1000
-            self._record_failure()
-            log.error("gemini.generate_query_embedding.failed", error=str(exc))
-            raise EmbeddingError(f"Query embedding generation failed: {exc}") from exc
+        return await self.generate_embedding(text)
 
     async def generate_structured(
         self,
@@ -244,37 +247,52 @@ class GeminiClient:
     ) -> T:
         """
         Generate structured JSON output and validate against a Pydantic model.
-        Uses response_mime_type: "application/json".
         """
-        import json as _json
-
         raw_text = await self.generate_text(
             prompt,
             model=model,
             temperature=temperature,
-            response_schema=None,  # We'll parse manually for broader compatibility
+            response_schema=schema_class.model_json_schema(),
         )
 
         try:
-            parsed = _json.loads(raw_text)
+            parsed = json.loads(raw_text)
             return schema_class.model_validate(parsed)
-        except (_json.JSONDecodeError, Exception) as exc:
+        except (json.JSONDecodeError, Exception) as exc:
             logger.error(
-                "gemini.structured_parse_failed",
+                "ollama.structured_parse_failed",
                 error=str(exc),
                 raw_text_len=len(raw_text),
             )
+            try:
+                import re
+                cleaned = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+                try:
+                    parsed = json.loads(cleaned)
+                    return schema_class.model_validate(parsed)
+                except Exception:
+                    pass
+                match = re.search(r"```(?:json)?\n?(.*?)\n?```", cleaned, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group(1))
+                    return schema_class.model_validate(parsed)
+                match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group(0))
+                    return schema_class.model_validate(parsed)
+            except Exception:
+                pass
+
             raise GeminiAPIError(
-                f"Failed to parse Gemini response as {schema_class.__name__}: {exc}"
+                f"Failed to parse Ollama response as {schema_class.__name__}: {exc}"
             ) from exc
 
 
-# Module-level singleton
 _client: GeminiClient | None = None
 
 
 def get_gemini_client() -> GeminiClient:
-    """Get or create the singleton Gemini client."""
+    """Get or create the singleton Ollama client."""
     global _client
     if _client is None:
         _client = GeminiClient()
