@@ -430,12 +430,17 @@ Source: `data/reports/trace_stats.json`, raw traces in `data/traces/run_natural0
 
 | Stage | n | Median (ms) | P95 (ms) | Max (ms) | Share of median |
 |---|---|---|---|---|---|
-| `query_planner` (1 LM call) | 30 | 7,644 | 9,743 | 10,636 | 13.7 % |
-| `retriever` (FAISS + ts_rank) | 30 | 298 | 507 | 535 | 0.5 % |
-| `precedent_weighting` | 30 | 38 | 167 | 183 | 0.1 % |
-| **`debate` (7 LM calls)** | 30 | **46,882** | 53,764 | 54,634 | **83.9 %** |
-| `evaluator` | 30 | 2 | 4 | 5 | 0.004 % |
-| **`scheduler` (total)** | 30 | **73,981** | **91,987** | — | 100 % |
+| `query_planner` (1 LM call) | 30 | 9,716 | 12,641 | 18,948 | 13.1 % |
+| `retriever` (FAISS + ts_rank) | 30 | 550 | 3,232 | 3,537 | 0.7 % |
+| `precedent_weighting` | 30 | 144 | 835 | 1,956 | 0.2 % |
+| **`debate` (7 LM calls)** | 30 | **62,891** | 73,761 | 77,304 | **85.0 %** |
+| `evaluator` | 30 | 3 | 32 | 70 | 0.004 % |
+| **`scheduler` (total)** | 30 | **73,981** | **91,987** | 111,615 | 100 % |
+
+Per-agent medians sum to less than the scheduler total because the retriever, weighter and
+evaluator run **once per iteration** (mean 2.30) while the table reports the median of a single
+invocation. Debate runs once per query — it is guarded to the first pass unless `redebate` is
+selected, which never happened here.
 
 Read against the retrieval-side latencies in §8.1: **`hybrid_cite` answers in 3.8 ms; the agent layer
 around it costs ~74,000 ms.** That ratio — roughly 19,000× — is the paper's most quotable systems
@@ -468,21 +473,22 @@ The rate is over the 3! = 6 reachable permutations of a 3-item list, not over th
 Phrased honestly: *adversarial debate reordered the top-3 slate in two thirds of queries, changing
 which precedent is presented first.*
 
-A narratable example (`debate_examples.json[0]`) — query on whether the Arbitration and Conciliation
-Act permits joinder of a **non-signatory** to an arbitration agreement:
+A narratable example (`debate_examples.json[0]`) — query: *"Can a government department issue an
+office memorandum or executive instruction that conflicts with statutory service rules?"*
 
-- **was_top** `2020_3_1_328_EN` (*Indore Development Authority v. Manoharlal*) — demoted. Opposing
-  counsel: "may not be the strongest precedent … The factual matrix of this case is distinct from
-  those involving arbitration agreements and non-signatories."
-- **now_top** `2024_11_2173_2328_EN` — promoted. Advocate: "directly addresses the issue of whether
-  non-signatories can be joined to an arbitration agreement, which is precisely one of the ancillary
-  issues in question."
-- **Synthesis rationale:** "Case 2024_11_2173_2328_EN directly addresses non-signatories joining
-  arbitration agreements, which is a key issue."
+- **was_top** `2018_7_1_378_EN` (*Government of NCT of Delhi v. Union of India*) — demoted. Opposing
+  counsel: "does not directly address the issue of whether a government department can issue an
+  office memorandum or executive instruction that conflicts…"
+- **now_top** `2022_15_847_898_EN` (*State of Himachal Pradesh v. Raj Kumar*) — promoted. Advocate:
+  "directly addresses the issue of whether executive instructions or memoranda…"
+- **Synthesis rationale:** "The 2022 case directly addresses the issue of executive instructions
+  versus statutory rules, making it the most relevant."
 
-*Indore Development Authority* is a land-acquisition authority — a famous, heavily-cited judgment
-that the lexical and authority signals rank highly, and that argumentation demotes as off-point.
-That is exactly the failure mode the debate stage exists to catch, and it is the example to narrate.
+*Government of NCT of Delhi* is the Delhi services constitutional case — one of the most heavily
+cited judgments in the corpus, which is exactly why the lexical and authority signals float it to
+rank 1, and exactly why it is wrong here. Argumentation demotes it for a narrower, on-point
+authority. That is the failure mode the debate stage exists to catch, and it is the example to
+narrate.
 
 Caveat for the write-up: no human adjudicated whether the *new* top case is actually better.
 **56.7 % is a change rate, not an accuracy gain.** Do not present it as one.
@@ -636,8 +642,8 @@ Three things to note:
 | ~~Agent-level table (§8.2)~~ | **DONE — 30 traces, 14 Aug, threshold 0.85** | No |
 | ~~Debate-side JSON failure rate~~ | **DONE — 0 failures in 240 LM calls** | No |
 | Debate *quality* (does the promoted case beat the demoted one?) | Human adjudication of the 9 reorderings in `debate_examples.json` — ~2 h | No, but §8.2.2 must be worded as a change rate until it exists |
-| **`reweight` fights itself** | It gains `score_dispersion` (+0.32) and loses `top_margin` (−0.33) for a net ≈ +0.015. Reassign `top_margin` to `rewiden` and re-run — one 35-min run | No, but it is the first thing a reviewer will spot in §8.2.3 |
-| **`issue_coverage` and `debate_consensus` are saturated** | Both 1.000 on all 30 queries, so `replan` and `redebate` never fire and their cost (+1 / +7 LM calls) is inferred, not measured. Tighten both definitions | No — report as a limitation |
+| **`reweight` is a failed remedy** | It moves `ranking_decisiveness` **−0.055** (11/24 improved — worse than chance), because shifting weight onto factual alignment compresses spread within the top-10, which is what NQC measures. Either drop it and let `rewiden` carry the loop, or give the weighter a lever that increases within-top-k separation | **No — reported as a finding, by decision.** §8.2.3 states it plainly |
+| **`issue_coverage` and `debate_consensus` are saturated** | Both 1.000 on all 30 queries, so `replan` and `redebate` never fire and their cost (+1 / +7 LM calls) is inferred, not measured. With two of four signals pinned, confidence has only ~2 effective degrees of freedom — the sharpest limit on what the scheduler can diagnose. Tighten both definitions | No — report as a limitation |
 | Natural queries written by a lawyer | The 30 test questions are model-authored (§2.2). ~2 h of a practising lawyer's time would remove the caveat | No — disclose |
 | Agent-level results at larger n | 30 queries; the retrieval tables use 394 | No — state the n |
 | Chunked dense channel | A CUDA box or ≥ 32 GB RAM — encoding collapsed at 24k/95,350 chunks under swap thrash | No — report as open |
