@@ -1,4 +1,0 @@
-# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\agents\evaluator.py
-# hypothesis_version: 6.131.15
-
-[0.0, 0.2, 0.3, 0.4, 1.0, 'authority_score', 'confidence', 'coverage', 'debate_result', 'disagreement_flags', 'disagreement_rate', 'evaluator', 'extracted_issues', 'facts_text', 'final_score', 'issues_text', 'mrr', 'ndcg_at_10', 'needs_refinement', 'precision_at_10', 'precision_at_5', 'query_id', 'ranked_cases']

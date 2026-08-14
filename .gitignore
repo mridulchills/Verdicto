@@ -1,41 +1,66 @@
-# Python
-Backend/venv/
-backend/venv/
+# ── Python ───────────────────────────────────────────────────────────────
+venv/
+.venv/
+.venv-*/
+**/venv/
+**/.venv/
+**/.venv-*/
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.egg-info/
 .pytest_cache/
+.hypothesis/
 .coverage
 htmlcov/
+.mypy_cache/
+.ruff_cache/
 
-# Node
-Frontend/node_modules/
+# ── Node ─────────────────────────────────────────────────────────────────
+node_modules/
+**/node_modules/
 Frontend/dist/
-Frontend/webapp/node_modules/
 Frontend/webapp/dist/
+*.tsbuildinfo
 
-# Data (local storage — gitignored)
-Data/
+# ── Corpus and derived artefacts ─────────────────────────────────────────
+# The whole AWS bucket lands here (~3.2 GB for 2016-2024). Never commit any of it:
+#   data/raw/pdfs/         downloaded judgment PDFs
+#   data/raw/metadata/     Parquet metadata
+#   data/processed/        extracted text + segmented JSON
+#   data/embeddings/       .npy vectors
+#   data/index/            FAISS index + case_id mapping
+#   data/eval/             queries, qrels, TREC run files, BM25 cache
+#   data/reports/          measurement reports written by scripts/eval/*
 data/
-data/raw/
-data/processed/
-data/embeddings/
-data/index/
+Data/
 *.index
 *.npy
+*.parquet
+*.tar
 
-# Env
+# Evaluation outputs, wherever they are written
+qrels.txt
+run_*.txt
+per_query_scores.json
+bm25_corpus.json
+
+# ── Logs ─────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Env / secrets ────────────────────────────────────────────────────────
 .env
+.env.*
+!.env.example
 
-# OS
+# ── OS ───────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Docker
+# ── Docker ───────────────────────────────────────────────────────────────
 postgres_data/
 
-# IDE
+# ── IDE ──────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 .kiro/

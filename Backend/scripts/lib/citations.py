@@ -28,14 +28,27 @@ from dataclasses import dataclass, field
 # ── Reporter patterns ────────────────────────────────────────────────────────
 # Each pattern must expose named groups that normalise_citation() understands.
 
+# Reporter abbreviations appear with or without periods and with either bracket
+# style. VERIFIED against the real AWS bucket metadata, where the canonical form is
+# "[2020] 4 S.C.R. 552" (square brackets, periods) — NOT the "(2020) 4 SCR 552" form
+# assumed before the data was inspected. Both are accepted.
+_SCR = r"S\.?\s?C\.?\s?R\.?"          # SCR / S.C.R. / S. C. R.
+_SCC = r"S\.?\s?C\.?\s?C\.?"          # SCC / S.C.C.
+_YB = r"[\(\[]\s*(?P<year>\d{4})\s*[\)\]]"   # (2020) or [2020]
+
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("AIR", re.compile(r"\bAIR\s+(?P<year>\d{4})\s+SC\s+(?P<num>\d{1,5})\b", re.I)),
     ("AIRONLINE", re.compile(r"\bAIRONLINE\s+(?P<year>\d{4})\s+SC\s+(?P<num>\d{1,5})\b", re.I)),
-    ("SCC", re.compile(r"\((?P<year>\d{4})\)\s*(?P<vol>\d{1,2})\s*SCC\s*(?P<num>\d{1,5})\b", re.I)),
-    ("SCC", re.compile(r"\b(?P<year>\d{4})\s*\(\s*(?P<vol>\d{1,2})\s*\)\s*SCC\s*(?P<num>\d{1,5})\b", re.I)),
-    ("SCR", re.compile(r"\((?P<year>\d{4})\)\s*(?P<vol>\d{1,2})\s*SCR\s*(?P<num>\d{1,5})\b", re.I)),
-    ("SCR", re.compile(r"\b(?P<year>\d{4})\s*\(\s*(?P<vol>\d{1,2})\s*\)\s*SCR\s*(?P<num>\d{1,5})\b", re.I)),
-    ("INSC", re.compile(r"\b(?P<year>\d{4})\s+INSC\s+(?P<num>\d{1,5})\b", re.I)),
+    # [2020] 4 S.C.R. 552   /   (2020) 4 SCR 552
+    ("SCR", re.compile(_YB + r"\s*(?P<vol>\d{1,2})\s*" + _SCR + r"\s*(?P<num>\d{1,5})\b", re.I)),
+    # 2020 (4) S.C.R. 552
+    ("SCR", re.compile(r"\b(?P<year>\d{4})\s*\(\s*(?P<vol>\d{1,2})\s*\)\s*" + _SCR + r"\s*(?P<num>\d{1,5})\b", re.I)),
+    # [1973] 4 S.C.C. 225   /   (1973) 4 SCC 225
+    ("SCC", re.compile(_YB + r"\s*(?P<vol>\d{1,2})\s*" + _SCC + r"\s*(?P<num>\d{1,5})\b", re.I)),
+    # 2017 (10) SCC 1
+    ("SCC", re.compile(r"\b(?P<year>\d{4})\s*\(\s*(?P<vol>\d{1,2})\s*\)\s*" + _SCC + r"\s*(?P<num>\d{1,5})\b", re.I)),
+    # 2023 INSC 456  and the compact metadata form 2023INSC456
+    ("INSC", re.compile(r"\b(?P<year>\d{4})\s*INSC\s*(?P<num>\d{1,5})\b", re.I)),
     ("SCCONLINE", re.compile(r"\b(?P<year>\d{4})\s+SCC\s+OnLine\s+SC\s+(?P<num>\d{1,5})\b", re.I)),
 ]
 
@@ -159,15 +172,30 @@ def strip_leakage(text: str) -> str:
 
 
 def normalise_metadata_citation(raw: str | None) -> str | None:
+    """First canonical form found in a metadata citation string, or None."""
+    forms = normalise_metadata_citations(raw)
+    return forms[0] if forms else None
+
+
+def normalise_metadata_citations(raw: str | None) -> list[str]:
     """
-    Normalise a citation string stored in cases.citation into the same canonical
-    form as find_citations(), so extracted citations can be looked up directly.
-    Returns None if the string matches no known reporter format.
+    ALL canonical forms found in a metadata citation string.
+
+    The AWS metadata gives a case two independent citations — the reporter form
+    ("[2020] 4 S.C.R. 552") and the neutral form ("2020 INSC 395"). load_metadata.py
+    stores both, separated by " | ", so that a citing judgment which uses EITHER form
+    still resolves. Indexing both roughly doubles the achievable resolution rate.
     """
     if not raw:
-        return None
+        return []
     res = find_citations(raw, mark_discussed=False)
-    return res.citations[0].canonical if res.citations else None
+    seen: set[str] = set()
+    out: list[str] = []
+    for c in res.citations:
+        if c.canonical not in seen:
+            seen.add(c.canonical)
+            out.append(c.canonical)
+    return out
 
 
 def name_key(title: str | None) -> str | None:

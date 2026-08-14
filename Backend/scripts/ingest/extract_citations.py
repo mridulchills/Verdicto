@@ -28,7 +28,7 @@ import asyncio
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from scripts.lib.citations import find_citations, name_key, normalise_metadata_citation
+from scripts.lib.citations import find_citations, name_key, normalise_metadata_citations
 from scripts.lib.report import EventLog, Report
 
 
@@ -62,9 +62,12 @@ async def run(args: argparse.Namespace) -> None:
     for case_id, citation, title, pet, resp in rows:
         if citation:
             citation_populated += 1
-            canon = normalise_metadata_citation(citation)
-            if canon and canon not in by_citation:
-                by_citation[canon] = case_id
+            # Index EVERY canonical form in the field. load_metadata.py stores the
+            # reporter citation and the neutral citation together ("... | 2020 INSC 395"),
+            # and a citing judgment may use either.
+            for canon in normalise_metadata_citations(citation):
+                if canon not in by_citation:
+                    by_citation[canon] = case_id
         k = name_key(title)
         if k and k not in by_name:
             by_name[k] = case_id

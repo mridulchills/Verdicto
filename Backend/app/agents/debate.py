@@ -107,6 +107,24 @@ def _parse_json(text: str) -> dict:
     raise ValueError(f"No valid JSON in response (first 200 chars): {cleaned[:200]}")
 
 
+def _clean_case_id(value: Any) -> str:
+    """
+    Normalise a case id returned by the model.
+
+    The prompts present each case as `case_id: <id>`, and the model frequently echoes
+    that shape back inside final_ranking — "case_id=2023_15_1081_1212_EN" or
+    "case_id: 2023_15_1081_1212_EN" instead of the bare id. An unnormalised value
+    matches nothing in the scheduler's case_map, so the whole reordering is silently
+    dropped (scheduler.py) while the trace still records a reordering that never
+    happened. Strip the echoed key, surrounding quotes and whitespace.
+    """
+    s = str(value).strip().strip("\"'").strip()
+    m = re.match(r"^case[_ ]?id\s*[:=]\s*(.+)$", s, re.IGNORECASE)
+    if m:
+        s = m.group(1)
+    return s.strip().strip("\"'").strip()
+
+
 # ── Per-case debate (sequential advocate → opposing) ─────────────────────────
 
 async def _debate_one_case(
@@ -250,8 +268,21 @@ class DebateAgent(BaseAgent):
                 }
 
             # ── Build final ranking — never drop cases ────────────────────
-            final_ranking: list[str] = list(synthesis.get("final_ranking", []))
+            # Only cases that were actually debated may appear: the model both echoes
+            # the "case_id=" key (see _clean_case_id) and occasionally invents ids, and
+            # either one silently voids the reordering downstream.
             debated_ids = [e["case_id"] for e in entries]
+            final_ranking: list[str] = []
+            dropped: list[str] = []
+            for raw in synthesis.get("final_ranking", []):
+                cid = _clean_case_id(raw)
+                if cid in debated_ids and cid not in final_ranking:
+                    final_ranking.append(cid)
+                elif cid not in debated_ids:
+                    dropped.append(str(raw))
+            if dropped:
+                logger.warning("debate.synthesis_unknown_case_ids",
+                               query_id=qid, dropped=dropped)
             for cid in debated_ids:
                 if cid not in final_ranking:
                     final_ranking.append(cid)

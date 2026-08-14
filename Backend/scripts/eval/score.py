@@ -57,6 +57,8 @@ def main() -> None:
                     help="metric used for the significance tests")
     ap.add_argument("--resamples", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--tag", type=str, default="",
+                    help="query-regime suffix to score, e.g. --tag _short")
     args = ap.parse_args()
 
     try:
@@ -72,15 +74,23 @@ def main() -> None:
         raise SystemExit(f"No {qrels_path}. Run build_golden_set.py first.")
 
     qrels = list(ir_measures.read_trec_qrels(str(qrels_path)))
-    runs = sorted(eval_dir.glob("run_*.txt"))
+    # --tag selects one query regime (e.g. _short). Without it, only untagged runs are
+    # scored, so regimes are never accidentally mixed into the same table.
+    if args.tag:
+        runs = sorted(eval_dir.glob(f"run_*{args.tag}.txt"))
+    else:
+        tagged = {p for t in ("_short", "_keyword", "_medium", "_long")
+                  for p in eval_dir.glob(f"run_*{t}.txt")}
+        runs = sorted(p for p in eval_dir.glob("run_*.txt") if p not in tagged)
     if not runs:
         raise SystemExit(f"No run_*.txt in {eval_dir}. Run run_eval.py first.")
 
+    # Column order matches the paper's Table 1: P@1, P@5, R@20, MRR, nDCG@10
     measures = [parse_measure(m) for m in
-                ["nDCG@10", "nDCG@20", "P@5", "P@10", "RR", "R@20", "R@100"]]
+                ["P@1", "P@5", "R@20", "RR", "nDCG@10", "P@10", "nDCG@20", "R@100"]]
     primary = parse_measure(args.primary)
 
-    rep = Report("score", data, args)
+    rep = Report(f"score{args.tag}", data, args)
     rep.section("Evaluation set")
     rep.stat("qrels_file", str(qrels_path))
     rep.stat("judgements", len(qrels))
@@ -94,6 +104,8 @@ def main() -> None:
     per_query: dict[str, dict[str, float]] = {}
     for run_path in runs:
         cond = run_path.stem.replace("run_", "")
+        if args.tag:
+            cond = cond[: -len(args.tag)] if cond.endswith(args.tag) else cond
         run = list(ir_measures.read_trec_run(str(run_path)))
         if not run:
             print(f"[warn] {run_path.name} is empty, skipping")

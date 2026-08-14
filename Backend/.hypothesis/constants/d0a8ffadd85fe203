@@ -1,4 +1,0 @@
-# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\core\config.py
-# hypothesis_version: 6.131.15
-
-[0.65, 8000, '../.env', './data/processed/', './data/raw/', '.env', '0.0.0.0', 'INFO', 'Settings', 'Settings | None', 'all-MiniLM-L6-v2', 'before', 'cors_origins', 'deepseek-r1:8b', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-embedding-001', 'ignore', 'utf-8']

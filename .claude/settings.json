@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Python(*)",
+      "Shell(*)",
+      "JSON(*)",
+      "Write(*)",
+      "Read(*)",
+      "Edit(*)",
+      "Delete(*)",
+      "File(*)",
+      "Directory(*)",
+      "Path(*)",
+      "Settings(*)",
+      "Code(*)",
+      "Script(*)",
+      "Command(*)",
+      "Terminal(*)"
+      
+    ]
+  }
+}

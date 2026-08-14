@@ -1,4 +1,0 @@
-# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\agents\query_planner.py
-# hypothesis_version: 6.131.15
-
-[0.1, 0.3, 0.5, '<think>.*?</think>', 'Empty query provided', '\\{.*\\}', '```', 'any', 'confidence', 'extracted_facts', 'extracted_issues', 'flash', 'general', 'legal_domain', 'original_query', 'query', 'query_id', 'query_planner', 'reformulated_queries', 'target_outcome', 'temporal_hint', '{']

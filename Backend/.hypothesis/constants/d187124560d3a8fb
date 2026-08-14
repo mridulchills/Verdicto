@@ -1,4 +1,0 @@
-# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\core\gemini_client.py
-# hypothesis_version: 6.131.15
-
-[0.1, 0.2, 1000, 1024, '<think>.*?</think>', 'T', '\\{.*\\}', 'embedding', 'eval_count', 'flash', 'format', 'json', 'model', 'num_predict', 'ollama.circuit_open', 'options', 'prompt', 'prompt_eval_count', 'response', 'stream', 'temperature', 'total_calls', 'total_prompt_tokens']

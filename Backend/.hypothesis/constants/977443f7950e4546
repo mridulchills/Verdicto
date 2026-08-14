@@ -1,4 +1,0 @@
-# file: C:\Users\Pravesh\Desktop\Verdicto\Backend\app\core\exceptions.py
-# hypothesis_version: 6.131.15
-
-['AGENT_FAILED', 'CASE_NOT_FOUND', 'DATABASE_ERROR', 'EMBEDDING_ERROR', 'GEMINI_API_ERROR', 'GEMINI_CIRCUIT_OPEN', 'INDEX_NOT_FOUND', 'INTERNAL_ERROR', 'VALIDATION_ERROR', 'code', 'message', 'query_id']
