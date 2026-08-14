@@ -4,6 +4,7 @@ Computes P@K, nDCG@K, MRR, Coverage, and overall confidence.
 """
 from __future__ import annotations
 import math
+import re
 from typing import Any
 import structlog
 from app.agents.base_agent import BaseAgent
@@ -11,6 +12,17 @@ from app.core.config import get_settings
 
 logger = structlog.get_logger()
 settings = get_settings()
+
+# Legal boilerplate carries no topical signal — every judgment contains it, so leaving
+# these in would make coverage look high for any pair of unrelated cases.
+_STOPWORDS = {
+    "that", "this", "with", "from", "have", "been", "were", "which", "their", "there",
+    "would", "could", "shall", "such", "than", "then", "them", "these", "those", "under",
+    "upon", "into", "when", "what", "whether", "case", "cases", "court", "courts",
+    "appeal", "appellant", "respondent", "petitioner", "judgment", "order", "orders",
+    "section", "sections", "act", "acts", "law", "legal", "india", "supreme", "high",
+    "learned", "counsel", "para", "paragraph", "hon", "ble", "also", "shall", "said",
+}
 
 
 def _dcg(relevance_scores: list[float], k: int) -> float:
@@ -57,19 +69,51 @@ class EvaluatorAgent(BaseAgent):
                 mrr = 1.0 / (i + 1)
                 break
 
-        # Coverage: % of query issues addressed
+        # Coverage: % of query issues addressed.
+        #
+        # This used to test `issue.lower()[:20] in all_case_text` — an exact 20-character
+        # prefix match of a generated natural-language issue against the concatenated case
+        # text. That essentially never fires, so coverage was ~always 0.0, which silently
+        # capped confidence at 0.80 (= 0.3 + 0.3 + 0.2) and made any threshold above 0.80
+        # unreachable by construction. Compare distinctive content words instead.
         coverage = 0.0
-        if query_issues and ranked_cases:
+        coverage_applicable = bool(query_issues and ranked_cases)
+        if coverage_applicable:
             all_case_text = " ".join(
                 (c.get("issues_text", "") + " " + c.get("facts_text", "")).lower()
                 for c in ranked_cases[:10]
             )
-            matched = sum(1 for issue in query_issues if issue.lower()[:20] in all_case_text)
-            coverage = matched / len(query_issues)
+            case_tokens = set(re.findall(r"[a-z]{4,}", all_case_text)) - _STOPWORDS
+            matched = 0
+            scored_issues = 0
+            for issue in query_issues:
+                terms = set(re.findall(r"[a-z]{4,}", issue.lower())) - _STOPWORDS
+                if not terms:
+                    continue
+                scored_issues += 1
+                # An issue counts as addressed when half its distinctive terms appear
+                # somewhere in the top-10 case text.
+                if len(terms & case_tokens) / len(terms) >= 0.5:
+                    matched += 1
+            if scored_issues:
+                coverage = matched / scored_issues
+            else:
+                # Every issue was pure boilerplate — nothing measurable to cover.
+                coverage_applicable = False
 
         # Overall confidence — round before threshold comparison to avoid
-        # floating-point edge cases where 0.6499999... < 0.65 but rounds to 0.65
-        confidence_rounded = round(p_at_5 * 0.3 + ndcg_10 * 0.3 + mrr * 0.2 + coverage * 0.2, 4)
+        # floating-point edge cases where 0.6499999... < 0.65 but rounds to 0.65.
+        #
+        # When the planner extracted no issues there is nothing for coverage to measure,
+        # so it is dropped and the remaining weights are renormalised. Scoring it as 0.0
+        # would deduct 0.2 for a fact about the QUERY rather than about the results, and
+        # would cap confidence at 0.80 — below the 0.85 threshold, making convergence
+        # impossible however good the ranking is.
+        weighted = p_at_5 * 0.3 + ndcg_10 * 0.3 + mrr * 0.2
+        if coverage_applicable:
+            confidence_rounded = round(weighted + coverage * 0.2, 4)
+        else:
+            confidence_rounded = round(weighted / 0.8, 4)
 
         # Check debate disagreement
         disagreements = debate_result.get("disagreement_flags", [])

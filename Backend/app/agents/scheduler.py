@@ -27,6 +27,82 @@ def _ms(start: float) -> int:
     return int((time.monotonic() - start) * 1000)
 
 
+# ── Adaptive re-scheduling ───────────────────────────────────────────────────
+# The evaluator's confidence is a weighted sum of four components. Each component
+# has exactly one agent that can plausibly move it, so a deficient component names
+# the agent to re-run. Re-running everything (the old behaviour) is both wasteful
+# and a no-op: the pipeline is deterministic, so an unchanged input re-derives an
+# identical output.
+#
+#   coverage        the retrieved cases do not speak to the query's issues
+#                   -> the QUESTION is wrong          -> re-plan
+#   precision@5     the pool is topically right but weakly scored
+#   nDCG@10         "                                 -> the POOL is wrong  -> re-retrieve
+#   MRR             a good case exists but is not at the top
+#                   -> the ORDER is wrong             -> re-weight
+#   disagreement    the advocates could not agree on the top-3
+#                   -> the ARGUMENT is unsettled      -> re-debate
+#
+# Confidence weights, from EvaluatorAgent.run:
+_CONFIDENCE_WEIGHTS = {
+    "precision_at_5": 0.3,
+    "ndcg_at_10": 0.3,
+    "mrr": 0.2,
+    "coverage": 0.2,
+}
+_AGENT_FOR_METRIC = {
+    "coverage": "replan",
+    "precision_at_5": "rewiden",
+    "ndcg_at_10": "rewiden",
+    "mrr": "reweight",
+}
+# What each action re-runs, in pipeline order. The scheduler runs the named agent
+# and then everything downstream of it — that is the "pass its work to the next
+# agent" part; a re-ranked list still has to be re-evaluated to score the change.
+_DOWNSTREAM = {
+    "replan":   ("query_planner", "retriever", "precedent_weighting", "evaluator"),
+    "rewiden":  ("retriever", "precedent_weighting", "evaluator"),
+    "reweight": ("precedent_weighting", "evaluator"),
+    "redebate": ("debate", "evaluator"),
+}
+# Ordering is wrong -> trust query-alignment over global fame. Renormalised to 1.0.
+_REWEIGHT_OVERRIDES = {
+    "factual_alignment": 0.40,
+    "citation_count": 0.15,
+    "bench_size": 0.15,
+    "recency": 0.15,
+    "domain_match": 0.15,
+}
+
+
+def _diagnose(eval_result: dict[str, Any], tried: set[str],
+              debate_enabled: bool) -> tuple[str | None, str]:
+    """Pick the one agent most likely to raise confidence. Returns (action, reason).
+
+    Chooses by *headroom* — weight x (1 - value) — not by raw value, because a
+    0.5 coverage (weight 0.2) is worth less than a 0.6 nDCG (weight 0.3).
+    An action is only ever attempted once per query: if it did not help, the next
+    pass moves to the next-best remedy instead of repeating a known no-op.
+    """
+    if (eval_result.get("disagreement_rate", 0.0) > 0.3
+            and debate_enabled and "redebate" not in tried):
+        return "redebate", (f"debate disagreement "
+                            f"{eval_result.get('disagreement_rate', 0.0):.2f} > 0.30")
+
+    headroom = {
+        metric: weight * (1.0 - float(eval_result.get(metric, 0.0) or 0.0))
+        for metric, weight in _CONFIDENCE_WEIGHTS.items()
+    }
+    for metric, gap in sorted(headroom.items(), key=lambda kv: kv[1], reverse=True):
+        action = _AGENT_FOR_METRIC[metric]
+        if action in tried:
+            continue
+        return action, (f"{metric}={float(eval_result.get(metric, 0.0) or 0.0):.3f} "
+                        f"leaves the largest confidence headroom ({gap:.3f})")
+
+    return None, "every remedy has been attempted"
+
+
 class SchedulerAgent(BaseAgent):
     name: str = "scheduler"
 
@@ -87,58 +163,121 @@ class SchedulerAgent(BaseAgent):
             best_result: dict[str, Any] = {}
             best_eval: dict[str, Any] = {}
             best_debate: dict[str, Any] = {}
+            best_confidence = -1.0
+
+            # Adaptive-scheduling state, carried across iterations.
+            retrieval_result: dict[str, Any] = {}
+            weight_result: dict[str, Any] = {}
+            ranked_cases: list[dict[str, Any]] = []
+            debate_result: dict[str, Any] = {}
+            tried_actions: set[str] = set()
+            variant_index = 0
+            weight_overrides: dict[str, float] = {}
+            history: list[dict[str, Any]] = []
+            action, reason = "initial", "first pass"
 
             while iteration < max_iter:
                 iteration += 1
-                logger.info("scheduler.iteration", iteration=iteration, query_id=qid)
+                # Which agents run this pass. The first pass is the full pipeline;
+                # every later pass runs only the diagnosed agent and its downstream.
+                stages = (("retriever", "precedent_weighting", "debate", "evaluator")
+                          if iteration == 1 else _DOWNSTREAM[action])
+                logger.info("scheduler.iteration", iteration=iteration, query_id=qid,
+                            action=action, reason=reason, stages=list(stages))
+
+                # ── Step 1b: Query Planner (re-plan only) ──────────────────
+                if "query_planner" in stages:
+                    t0 = time.monotonic()
+                    missing = plan_result.get("extracted_issues", [])[:3]
+                    replan_query = (
+                        f"{query}\n\n[Refine: an earlier search returned cases that did "
+                        f"not address these issues: {'; '.join(missing)}. Produce broader "
+                        f"alternative phrasings that would reach them.]"
+                    )
+                    plan_result = await QueryPlannerAgent().execute(
+                        {"query_id": qid, "query": replan_query})
+                    trace["query_planner"] = {
+                        "agent_name": "query_planner",
+                        "status": "complete",
+                        "latency_ms": _ms(t0),
+                        "input_size": len(replan_query),
+                        "output_size": len(str(plan_result)),
+                        "details": {
+                            "legal_domain": plan_result.get("legal_domain"),
+                            "issues_count": len(plan_result.get("extracted_issues", [])),
+                            "confidence": plan_result.get("confidence"),
+                            "reformulated_queries": len(plan_result.get("reformulated_queries", [])),
+                            "iteration": iteration,
+                            "replanned": True,
+                        },
+                    }
+                    await _callback()
 
                 # ── Step 2: Retriever ──────────────────────────────────────
-                t0 = time.monotonic()
-                retriever = RetrieverAgent(db_session=self._db)
-                retriever_input = {**plan_result, "filters": filters}
-                retrieval_result = await retriever.execute(retriever_input)
-                retriever_ms = _ms(t0)
+                if "retriever" in stages:
+                    t0 = time.monotonic()
+                    retriever = RetrieverAgent(db_session=self._db)
+                    # A re-retrieval must differ from the one that just failed, or it
+                    # re-derives the same candidates: advance to the next reformulation
+                    # and widen the pool.
+                    if iteration > 1:
+                        variant_index += 1
+                    retriever_input = {
+                        **plan_result,
+                        "filters": filters,
+                        "variant_index": variant_index,
+                        "top_k_override": settings.max_query_k * (1 + variant_index),
+                    }
+                    retrieval_result = await retriever.execute(retriever_input)
+                    retriever_ms = _ms(t0)
 
-                trace["retriever"] = {
-                    "agent_name": "retriever",
-                    "status": "complete",
-                    "latency_ms": retriever_ms,
-                    "input_size": len(str(retriever_input)),
-                    "output_size": len(str(retrieval_result)),
-                    "details": {
-                        "faiss_hits": retrieval_result.get("faiss_hits", 0),
-                        "bm25_hits": retrieval_result.get("bm25_hits", 0),
-                        "after_rrf": retrieval_result.get("after_rrf", 0),
-                        "iteration": iteration,
-                    },
-                }
-                await _callback()
+                    trace["retriever"] = {
+                        "agent_name": "retriever",
+                        "status": "complete",
+                        "latency_ms": retriever_ms,
+                        "input_size": len(str(retriever_input)),
+                        "output_size": len(str(retrieval_result)),
+                        "details": {
+                            "faiss_hits": retrieval_result.get("faiss_hits", 0),
+                            "bm25_hits": retrieval_result.get("bm25_hits", 0),
+                            "after_rrf": retrieval_result.get("after_rrf", 0),
+                            "iteration": iteration,
+                            "variant_index": retrieval_result.get("variant_index", 0),
+                            "top_k_used": retrieval_result.get("top_k_used"),
+                        },
+                    }
+                    await _callback()
 
                 # ── Step 3: Precedent Weighting ────────────────────────────
-                t0 = time.monotonic()
-                weighter = PrecedentWeighterAgent(db_session=self._db)
-                weight_input = {**plan_result, "candidates": retrieval_result.get("candidates", [])}
-                weight_result = await weighter.execute(weight_input)
-                weighter_ms = _ms(t0)
+                if "precedent_weighting" in stages:
+                    t0 = time.monotonic()
+                    weighter = PrecedentWeighterAgent(db_session=self._db)
+                    weight_input = {**plan_result,
+                                    "candidates": retrieval_result.get("candidates", []),
+                                    "weight_overrides": weight_overrides}
+                    weight_result = await weighter.execute(weight_input)
+                    weighter_ms = _ms(t0)
 
-                trace["precedent_weighting"] = {
-                    "agent_name": "precedent_weighting",
-                    "status": "complete",
-                    "latency_ms": weighter_ms,
-                    "input_size": len(retrieval_result.get("candidates", [])),
-                    "output_size": weight_result.get("reranked_count", 0),
-                    "details": {
-                        "reranked": weight_result.get("reranked_count", 0),
-                        "iteration": iteration,
-                    },
-                }
-                await _callback()
+                    trace["precedent_weighting"] = {
+                        "agent_name": "precedent_weighting",
+                        "status": "complete",
+                        "latency_ms": weighter_ms,
+                        "input_size": len(retrieval_result.get("candidates", [])),
+                        "output_size": weight_result.get("reranked_count", 0),
+                        "details": {
+                            "reranked": weight_result.get("reranked_count", 0),
+                            "iteration": iteration,
+                            "reweighted": bool(weight_overrides),
+                        },
+                    }
+                    await _callback()
 
-                ranked_cases = weight_result.get("ranked_cases", [])
+                    ranked_cases = weight_result.get("ranked_cases", [])
 
-                # ── Step 4: Debate (only on first iteration if enabled) ────
-                debate_result: dict[str, Any] = {}
-                if enable_debate and ranked_cases and iteration == 1:
+                # ── Step 4: Debate ─────────────────────────────────────────
+                # Runs on the first pass, and again only if the evaluator reports the
+                # advocates disagreed (action == "redebate").
+                if "debate" in stages and enable_debate and ranked_cases:
                     # Write "in_progress" marker so frontend knows debate is running
                     trace["debate"] = {
                         "agent_name": "debate",
@@ -244,24 +383,52 @@ class SchedulerAgent(BaseAgent):
                 }
                 await _callback()
 
-                best_result = {"ranked_cases": ranked_cases}
-                best_eval = eval_result
-                best_debate = debate_result
+                confidence = float(eval_result.get("confidence", 0.0) or 0.0)
+                history.append({
+                    "iteration": iteration,
+                    "action": action,
+                    "reason": reason,
+                    "stages_run": list(stages),
+                    "confidence": confidence,
+                    "precision_at_5": eval_result.get("precision_at_5"),
+                    "ndcg_at_10": eval_result.get("ndcg_at_10"),
+                    "mrr": eval_result.get("mrr"),
+                    "coverage": eval_result.get("coverage"),
+                })
+
+                # Keep the BEST pass, not the last one. A remedy can make things
+                # worse, and when it does we must not ship the degraded ranking.
+                if confidence > best_confidence:
+                    best_confidence = confidence
+                    best_result = {"ranked_cases": ranked_cases}
+                    best_eval = eval_result
+                    best_debate = debate_result
 
                 # Decision: iterate or finalize
                 if not eval_result.get("needs_refinement", False):
-                    logger.info(
-                        "scheduler.converged",
-                        iteration=iteration,
-                        confidence=eval_result.get("confidence"),
-                    )
+                    logger.info("scheduler.converged", iteration=iteration,
+                                confidence=confidence)
                     break
-                else:
-                    logger.info(
-                        "scheduler.low_confidence_requery",
-                        iteration=iteration,
-                        confidence=eval_result.get("confidence"),
-                    )
+
+                if iteration >= max_iter:
+                    logger.info("scheduler.cap_reached", iteration=iteration,
+                                confidence=confidence)
+                    break
+
+                # Diagnose which single agent to re-run next.
+                if action != "initial":
+                    tried_actions.add(action)
+                action, reason = _diagnose(eval_result, tried_actions, enable_debate)
+                if action is None:
+                    logger.info("scheduler.remedies_exhausted", iteration=iteration,
+                                confidence=confidence, tried=sorted(tried_actions))
+                    break
+
+                # Configure the remedy before the next pass runs it.
+                if action == "reweight":
+                    weight_overrides = dict(_REWEIGHT_OVERRIDES)
+                logger.info("scheduler.requery", iteration=iteration,
+                            confidence=confidence, next_action=action, reason=reason)
 
             elapsed_ms = _ms(pipeline_start)
 
@@ -276,6 +443,15 @@ class SchedulerAgent(BaseAgent):
                     "final_confidence": best_eval.get("confidence", 0),
                     "total_pipeline_ms": elapsed_ms,
                     "debate_enabled": enable_debate,
+                    # Adaptive-scheduling record (Q27/Q28): which agent was re-run on
+                    # each pass, why, and what it did to confidence.
+                    "iteration_history": history,
+                    "actions_taken": [h["action"] for h in history],
+                    "confidence_trajectory": [h["confidence"] for h in history],
+                    "confidence_gain": (round(history[-1]["confidence"] - history[0]["confidence"], 4)
+                                        if len(history) > 1 else 0.0),
+                    "best_confidence": round(best_confidence, 4) if best_confidence >= 0 else 0.0,
+                    "converged": bool(best_eval and not best_eval.get("needs_refinement", False)),
                     # Per-query LLM cost, as a delta against the pipeline-start snapshot.
                     # Read back by scripts/eval/trace_stats.py (Q37).
                     "token_usage": {

@@ -196,14 +196,25 @@ class RetrieverAgent(BaseAgent):
         reformulated = input_data.get("reformulated_queries", [])
         filters = input_data.get("filters", {})
 
-        # FAISS: use combined query for broader semantic coverage
-        search_queries = [original_query] + reformulated[:1]
+        # The scheduler re-runs this agent with a different reformulation when the
+        # evaluator reports a weak candidate pool. variant_index selects which of the
+        # planner's alternatives to lead with; without it we would re-issue the same
+        # search and get a bit-identical result (the fixed point this loop used to hit).
+        variant_index = int(input_data.get("variant_index", 0) or 0)
+        if reformulated and variant_index > 0:
+            i = (variant_index - 1) % len(reformulated)
+            lead = reformulated[i]
+            # Lead with the alternative phrasing, keep the original for anchoring.
+            search_queries = [lead, original_query]
+            bm25_query = lead
+        else:
+            # FAISS: use combined query for broader semantic coverage
+            search_queries = [original_query] + reformulated[:1]
+            # BM25: only the original — combined queries are too long for tsvector matching
+            bm25_query = original_query
         combined_query = " ".join(search_queries)
 
-        # BM25: use only the original query — combined queries are too long for tsvector matching
-        bm25_query = original_query
-
-        top_k = settings.max_query_k
+        top_k = int(input_data.get("top_k_override") or settings.max_query_k)
 
         try:
             # Run FAISS and BM25 concurrently
@@ -222,6 +233,8 @@ class RetrieverAgent(BaseAgent):
                 "faiss_hits": len(faiss_results),
                 "bm25_hits": len(bm25_results),
                 "after_rrf": len(final),
+                "variant_index": variant_index,
+                "top_k_used": top_k,
             }
 
         except Exception as e:

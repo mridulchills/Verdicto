@@ -4,20 +4,23 @@
 **Hardware for every latency figure:** Apple M5, macOS 26.5.2 arm64, 10 cores, 16 GB RAM, no CUDA
 **Evaluation:** 984 query cases, 3,635 citation-derived judgements, strict temporal split, graded relevance
 **Scoring:** `ir_measures`, paired bootstrap, 10,000 resamples, seed 42
-**Agent-level:** 30 queries driven end-to-end through the pipeline, local `deepseek-r1:8b` via Ollama
+**Agent-level:** 30 queries driven end-to-end, local `qwen2.5:7b-instruct` via Ollama, threshold 0.85
 
 Everything below is regenerated from the artefacts in `data/reports/` and `data/eval/` as of today.
 Where a number differs from `RESULTS_V3.md`, this file is authoritative and the difference is flagged.
 
-**Two stale-artefact warnings, so you don't cite the wrong file:**
+**Stale-artefact warnings, so you don't cite the wrong file:**
 
 - `data/reports/paper_tables.txt` was generated at 01:15 against a partial trace run of **12**
-  queries; `trace_stats.json` at 01:16 covers the full **30**. Its retrieval and corpus blocks agree
-  with this file; its `AGENT-LEVEL CHARACTERISATION` block does **not**. Use §8.2 below, not that block.
-- `RESULTS_V3.md` §8 says agent results are outstanding and names `qwen2.5:7b-instruct` as the
-  model. Both statements are now superseded: the traces were run, and they were run on
-  **`deepseek-r1:8b`** (`app/core/config.py:73`). This matters — the `<think>`-trace behaviour in
-  §8.2 is a deepseek-r1 property.
+  queries. Its retrieval and corpus blocks agree with this file; its
+  `AGENT-LEVEL CHARACTERISATION` block does **not**. Use §8.2 below, not that block.
+- **The model is `qwen2.5:7b-instruct`.** `config.py:73` declares `deepseek-r1:8b`, but `.env`
+  sets `OLLAMA_MODEL=qwen2.5:7b-instruct` and pydantic gives the env file precedence — verified by
+  resolving `get_settings().ollama_model`. `RESULTS_V3.md` §8 was right. Any claim about
+  `<think>`-trace overhead is a deepseek property and does **not** apply to these runs; the
+  `<think>`-stripping code in `gemini_client.py:158` exists but never fires.
+- **The 13 Aug trace run (§8.2) is superseded** — see §8.2.0. It was measured with the FAISS index
+  silently unloaded and with a broken coverage metric. Numbers below are from the 14 Aug re-run.
 
 ---
 
@@ -41,7 +44,7 @@ top of the ranking.
 The gain is monotone in query brevity, and it crosses zero. §3 gives the full metric-by-metric
 picture, which is sharper than nDCG@10 alone and is the honest basis for the paper's claim.
 
-### 0.1 The four claims the evidence actually supports
+### 0.1 The five claims the evidence actually supports
 
 Everything in this file reduces to these. Each is measured, each has a section, and each has its
 limit stated in the same sentence — write the paper from this list.
@@ -50,16 +53,18 @@ limit stated in the same sentence — write the paper from this list.
 |---|---|---|---|
 | 1 | Citation propagation gives **consistent, significant gains in recall and mid-depth precision** across all four query regimes — R@20 up in 4/4 (significant in 3), P@10 up in 4/4 (significant in 2). | Paired bootstrap, 10k resamples, n=394 | §3.2 |
 | 2 | It **improves the top of the ranking only for short queries**, and for 360-word queries unweighted RRF **significantly degrades** P@1 (−0.0244) and MRR (−0.0161) against tuned BM25. | Same table | §3.2, §3.3 |
-| 3 | The system's **cost is entirely in the LM layer**: retrieval answers in 3.8 ms, the agent pipeline takes 54,980 ms median, 87.5 % of it in a 7-call sequential debate. All local, zero API cost. | 30 end-to-end traces | §8.1, §8.2.1 |
-| 4 | **Adversarial debate reordered the top-3 slate in 66.7 % of queries** (20/30), i.e. it changed which precedent is shown first. Whether the new ordering is *better* is unadjudicated. | 30 traces + 20 worked examples | §8.2.2 |
+| 3 | The system's **cost is entirely in the LM layer**: retrieval answers in 3.8 ms, the agent pipeline takes 59,607 ms median, 83.9 % of it in a 7-call sequential debate. 8.0 LM calls per query, all local, zero API cost. | 30 end-to-end traces | §8.1, §8.2.1 |
+| 4 | **Adversarial debate reordered the top-3 slate in 43.3 % of queries** (13/30), i.e. it changed which precedent is shown first. Whether the new ordering is *better* is unadjudicated. | 30 traces + 13 worked examples | §8.2.2 |
+| 5 | **Metric-directed re-scheduling converges 30/30** at mean 1.10 iterations: 28 queries need no remedy, the 2 that do gain **+0.18 confidence** and then converge. Targeted re-runs cost no extra LM calls. | 30 traces, before/after ablation | §8.2.3 |
 
 Two framings to avoid, both of which a reviewer will catch: do **not** claim a general retrieval win
-over tuned BM25 (claim 2 forbids it), and do **not** present the 66.7 % debate rate as an accuracy
+over tuned BM25 (claim 2 forbids it), and do **not** present the 43.3 % debate rate as an accuracy
 improvement (claim 4 forbids it).
 
-Three results are also worth stating as negative findings rather than burying: the adaptive scheduler
-**never iterated** (§8.2.3), **three of six** v3 components were removed for hurting (§6), and the
-dev→test gain **collapsed** from +0.0209 to +0.0049 on the same regime (§4).
+Three results are also worth stating as negative findings rather than burying: **three of six** v3
+components were removed for hurting (§6), the dev→test gain **collapsed** from +0.0209 to +0.0049 on
+the same regime (§4), and two silent measurement defects — an unloaded FAISS index and a coverage
+metric that was structurally always 0 — invalidated the first agent-level run (§8.2.0).
 
 ---
 
@@ -353,30 +358,64 @@ not leakage.
 over from `RESULTS_V3.md` §3.1 and is **not currently backed by a report file** — re-run
 `build_bm25_full_index --mode doc` if you want to cite it.
 
+### 8.2.0 Which trace run to cite — the 13 Aug run is withdrawn
+
+Two runs exist. **Cite only the 14 Aug one.**
+
+| | 13 Aug (withdrawn) | **14 Aug (authoritative)** |
+|---|---|---|
+| Confidence threshold | 0.55 | **0.85** |
+| Scheduler | re-ran the whole pipeline | **adaptive: re-runs the diagnosed agent** |
+| FAISS dense channel | **silently dead** | loaded, 7,096 vectors |
+| Coverage metric | **structurally always 0** | content-word overlap |
+| Archive | `data/traces/archive_thresh055_n30.json` | `data/traces/run_thresh085.jsonl` |
+
+Two defects invalidated the 13 Aug agent numbers. Both are worth a line in the reproducibility
+appendix, because neither raised an error:
+
+1. **FAISS was never loaded.** `get_faiss_index().load()` is called only in `app/main.py:52`, the
+   API's startup lifespan. `run_agent_traces.py` invokes `SchedulerAgent` directly and bypassed it,
+   so `retriever.py:79` logged `faiss_not_loaded` and returned `[]` from the dense channel on every
+   query. The agent pipeline was running on Postgres `ts_rank` alone — the condition that scores
+   **2.30** nDCG@10 in §3.1's legacy row, the weakest channel measured. The runner now loads the
+   index explicitly and fails loudly.
+2. **Coverage was always 0.** `evaluator.py` tested `issue.lower()[:20] in all_case_text` — an exact
+   20-character prefix match of an LM-generated issue against concatenated case text, which
+   essentially never fires. Coverage carries weight 0.2, so confidence was capped at
+   **0.80 = 0.3 + 0.3 + 0.2**, and *any* threshold above 0.80 was unreachable by construction. It is
+   now a content-word overlap test.
+
+The second defect is why the 0.55 → 0.85 threshold change matters: at 0.85 against a 0.80 ceiling,
+**no query could ever have converged** and every one would have run to the iteration cap.
+
 ### 8.2 Agent-level — **MEASURED**, n = 30 queries
 
-`scripts/eval/run_agent_traces.py --n 30` drove 30 queries end-to-end through `SchedulerAgent`
-(the same path the API's BackgroundTask takes), then `scripts/eval/trace_stats.py` mined the
-persisted `QueryRecord.agent_trace`. **30/30 completed; 0 failed.** Model: `deepseek-r1:8b`, served
-locally by Ollama. Source: `data/reports/trace_stats.json`.
+`scripts/eval/run_agent_traces.py --n 30 --tag thresh085` drove 30 test-split queries end-to-end
+through `SchedulerAgent` (the same path the API's BackgroundTask takes), then
+`scripts/eval/trace_stats.py` mined the persisted traces. **30/30 completed; 0 failed.**
+
+**Model: `qwen2.5:7b-instruct`**, served locally by Ollama. Note that `config.py:73` declares
+`deepseek-r1:8b`; `.env` overrides it and pydantic gives the env file precedence. Verified by
+resolving `get_settings().ollama_model` and by 0 `<think>` traces in 240 completions.
+Source: `data/reports/trace_stats.json`, raw traces in `data/traces/run_thresh085.jsonl`.
 
 **8.2.1 End-to-end latency** — the headline is that this system is *slow*, and the reason is legible
 
 | Stage | n | Median (ms) | P95 (ms) | Max (ms) | Share of median |
 |---|---|---|---|---|---|
-| `query_planner` (1 LM call) | 30 | 7,172 | 9,898 | 10,177 | 13.0 % |
-| `retriever` | 30 | 111 | 121 | 122 | 0.2 % |
-| `precedent_weighting` | 30 | 42 | 56 | 70 | 0.1 % |
-| **`debate` (7 LM calls)** | 30 | **48,117** | 55,657 | 56,005 | **87.5 %** |
-| `evaluator` | 30 | 2 | 5 | 10 | 0.004 % |
-| **`scheduler` (total)** | 30 | **54,980** | **63,068** | 64,905 | 100 % |
+| `query_planner` (1 LM call) | 30 | 7,648 | 10,457 | 11,022 | 12.8 % |
+| `retriever` (FAISS + ts_rank) | 30 | 325 | 863 | 9,452 | 0.5 % |
+| `precedent_weighting` | 30 | 153 | 285 | 417 | 0.3 % |
+| **`debate` (7 LM calls)** | 30 | **49,990** | 56,600 | 75,087 | **83.9 %** |
+| `evaluator` | 30 | 4 | 11 | 17 | 0.007 % |
+| **`scheduler` (total)** | 30 | **59,607** | **66,295** | 86,339 | 100 % |
 
 Read against the retrieval-side latencies in §8.1: **`hybrid_cite` answers in 3.8 ms; the agent layer
-around it costs ~55,000 ms.** That ratio — roughly 14,000× — is the paper's most quotable systems
+around it costs ~59,600 ms.** That ratio — roughly 15,000× — is the paper's most quotable systems
 number, and it is entirely LM-bound. 8 of 8 LM calls are local; **zero external API calls, zero
 monetary cost per query.**
 
-- **PRD NFR-02 (P95 < 60 s) is missed at P95 = 63.1 s**, and the earlier P95 < 8 s target is missed
+- **PRD NFR-02 (P95 < 60 s) is missed at P95 = 66.3 s**, and the earlier P95 < 8 s target is missed
   by ~8×. Report the real distribution and revise the NFR; do not quietly restate the target.
 - Debate's 7 calls are **deliberately sequential** (`app/agents/debate.py:8–13`): Ollama on a single
   GPU queues concurrent requests and each then times out waiting. State this, or a reader assumes a
@@ -388,69 +427,108 @@ monetary cost per query.**
 | Quantity | Value |
 |---|---|
 | Queries with a usable debate trace | 30 / 30 |
-| **Debate changed the top precedent** | **20 / 30 = 66.7 %** |
-| Worked examples saved | 20, in `data/reports/debate_examples.json` |
+| **Debate changed the top precedent** | **13 / 30 = 43.3 %** |
+| Worked examples saved | 13, in `data/reports/debate_examples.json` |
 
-**State the scope precisely, because it is narrower than 66.7 % sounds.** Debate runs on iteration 1
+> The 13 Aug run put this at 66.7 % (20/30). That run fed debate a candidate list built without
+> the dense channel (§8.2.0), so debate had more bad top-3 slates to fix. **43.3 % is the number to
+> cite** — a better retrieval stage leaves debate less to correct, which is the expected direction.
+
+**State the scope precisely, because it is narrower than 43.3 % sounds.** Debate runs on iteration 1
 only and sees only the **top 3** retrieved cases, so it can never promote a case ranked 4th or lower.
 The rate is over the 3! = 6 reachable permutations of a 3-item list, not over the full result list.
 Phrased honestly: *adversarial debate reordered the top-3 slate in two thirds of queries, changing
 which precedent is presented first.*
 
-A narratable example (`debate_examples.json[0]`) — query on delay and laches in decades-later
-litigation:
+A narratable example (`debate_examples.json[0]`) — query on whether the Arbitration and Conciliation
+Act permits joinder of a **non-signatory** to an arbitration agreement:
 
-- **was_top** `2019_17_742_827_EN` (*BGS SGS SOMA JV v. NHPC Ltd.*) — demoted. Opposing counsel:
-  "does not directly address the issue of delay and laches … focuses on a dispute over the 'seat' of
-  arbitration proceedings, which is distinct."
-- **now_top** `2018_11_57_140_EN` (*Swapnil Tripathi v. Supreme Court of India*) — promoted.
-- **Synthesis rationale:** "Both cases address the principle of not allowing parties to litigate
-  issues decades later, with one providing a direct precedent."
+- **was_top** `2020_3_1_328_EN` (*Indore Development Authority v. Manoharlal*) — demoted. Opposing
+  counsel: "may not be the strongest precedent … The factual matrix of this case is distinct from
+  those involving arbitration agreements and non-signatories."
+- **now_top** `2024_11_2173_2328_EN` — promoted. Advocate: "directly addresses the issue of whether
+  non-signatories can be joined to an arbitration agreement, which is precisely one of the ancillary
+  issues in question."
+- **Synthesis rationale:** "Case 2024_11_2173_2328_EN directly addresses non-signatories joining
+  arbitration agreements, which is a key issue."
 
-This is a genuine lexical-overlap failure caught by argumentation rather than by scoring — which is
-exactly the claim the debate stage exists to support. Caveat for the write-up: no human adjudicated
-whether the *new* top case is actually better. **66.7 % is a change rate, not an accuracy gain.**
-Do not present it as one.
+*Indore Development Authority* is a land-acquisition authority — a famous, heavily-cited judgment
+that the lexical and authority signals rank highly, and that argumentation demotes as off-point.
+That is exactly the failure mode the debate stage exists to catch, and it is the example to narrate.
 
-**8.2.3 Scheduler behaviour**
+Caveat for the write-up: no human adjudicated whether the *new* top case is actually better.
+**43.3 % is a change rate, not an accuracy gain.** Do not present it as one.
+
+**8.2.3 Scheduler behaviour — adaptive re-scheduling**
+
+The scheduler no longer re-runs the whole pipeline on a low-confidence pass. It reads the
+evaluator's four confidence components, picks the one with the largest **headroom**
+(weight × shortfall), and re-runs only the agent that can move it, plus everything downstream:
+
+| Deficient component | Diagnosis | Agents re-run |
+|---|---|---|
+| `coverage` (w 0.2) | the question is wrong | `replan` → planner, retriever, weighter, evaluator |
+| `precision@5`, `nDCG@10` (w 0.3 each) | the candidate pool is wrong | `rewiden` → retriever (next reformulation, wider `top_k`), weighter, evaluator |
+| `MRR` (w 0.2) | the ordering is wrong | `reweight` → weighter (alignment-weighted), evaluator |
+| `disagreement_rate` > 0.3 | the argument is unsettled | `redebate` → debate, evaluator |
+
+Each remedy is attempted at most once per query, and the scheduler keeps the **best** pass rather
+than the last.
 
 | Quantity | Value |
 |---|---|
-| Mean iterations | 1.0 |
-| Max iterations | 1 |
-| Iteration distribution | 1 iteration: 30 queries (100.0 %) |
-| Fraction hitting the cap (`k_max` = 3) | **0.0 %** |
-| Mean final confidence | **0.8185** |
+| Mean iterations | **1.10** |
+| Max iterations | 3 |
+| Iteration distribution | 1 iter: 28 (93.3 %) · 2 iters: 1 (3.3 %) · 3 iters: 1 (3.3 %) |
+| Fraction hitting the cap (`k_max` = 3) | **3.3 %** |
+| **Queries that converged** | **30 / 30 (100 %)** |
+| Mean final confidence | **0.9877** (median 0.9982, min 0.8892) |
+| Remedies invoked | `rewiden` × 2, `reweight` × 1 |
+| **Confidence gain on the queries that iterated** | **+0.1805 mean** (+0.1811 max), 2 / 2 improved |
 
-The re-query loop **never fired**: mean evaluator confidence 0.8185 sits well above
-`confidence_threshold = 0.55` (`app/core/config.py:65`), so every query exited after one pass. Report
-this as-is. The adaptive scheduler is, on this sample, dead code at runtime — which is itself a
-finding, and it also means the measured latency is the *cheapest* possible path through the pipeline.
-A query that did iterate would cost roughly another 55 s.
+**This is the result to report.** 28/30 queries are good enough on the first pass and exit
+immediately; the 2 that are not get a targeted remedy, and both improve substantially and then
+converge. No query exhausted its remedies without converging. The loop is cheap because the
+remedies that fired (`rewiden`, `reweight`) are pure retrieval and ranking — **no additional LM
+calls** — which is why mean iterations rose to 1.10 while median latency moved only from 55.0 s to
+59.6 s.
+
+Contrast with the withdrawn 13 Aug run, where the same loop re-ran the entire pipeline and produced
+byte-identical passes: `plan_result` was computed once *outside* the loop (`scheduler.py:69`), the
+retriever always read `reformulated_queries[:1]` so the planner's other alternatives were dead code,
+and `top_k` and the weighting coefficients were constants. Deterministic inputs re-derive identical
+outputs, so iterating could only burn time. That contrast is the honest ablation — **an iteration
+loop is worth something only if the next iteration actually differs.**
 
 **8.2.4 LM output reliability and token usage**
 
 | Quantity | Value |
 |---|---|
-| LM invocations per query | **8 with debate (1 planner + 7 debate), 1 without** |
-| Planner JSON parse failures | **0 / 30** |
-| Planner failure rate | **0.0 %** |
-| Median prompt tokens per query | **3,736.5** |
-| Median completion tokens per query | **1,264.5** |
+| **LM invocations per query** | **8.0 exactly** — 240 calls / 30 queries |
+| Breakdown | 30 planner + 90 advocate + 90 opposing + 30 synthesis |
+| **LM output parse failures** | **0 / 240 (0.0 %)** — planner *and* debate |
+| Median prompt tokens per query | **3,749** |
+| Median completion tokens per query | **1,259** |
+| `<think>` traces emitted | **0** (confirms `qwen2.5:7b-instruct`, not a reasoning model) |
 | External API calls | **0** (all inference local) |
 | Monetary cost per query | **0** |
 
-Two things to disclose:
+Three things to note:
 
-1. The 0 % parse-failure rate is measured via a **sentinel**, not directly: the planner's degradation
-   path returns exactly `confidence = 0.3`, and no trace shows it. Debate-side parse failures are
-   **not** in the trace — completing that figure needs a grep of the server log for
-   `advocate_failed` / `opposing_failed` / `synthesis_failed`. Say the rate is planner-only.
-2. The completion-token count is inflated relative to visible output: `deepseek-r1` emits `<think>`
-   reasoning traces that are generated, counted, paid for in latency, and then **stripped and
-   discarded** (`gemini_client.py:158`, `debate.py:88`, `query_planner.py:77`). A clean 0 % parse rate
-   with a four-stage regex recovery ladder behind it is the argument for moving to an
-   instruction-tuned model with constrained JSON decoding.
+1. **The failure figure is now complete, not planner-only.** The planner rate comes from the trace
+   sentinel (its degradation path returns exactly `confidence = 0.3`; no trace shows it). The
+   debate side is not in the trace, so it was taken from the run log — `advocate_failed`,
+   `opposing_failed`, `synthesis_failed` and `debate_failed` are **all 0** across the run
+   (`data/traces/run_thresh085.log`). So: 0 failures in 240 LM calls.
+2. **8.0 calls per query is exact, not nominal.** The two queries that iterated used `rewiden` and
+   `reweight`, which touch retrieval and ranking only. Had `replan` or `redebate` fired they would
+   have added 1 and 7 calls respectively — worth stating, since the adaptive scheduler *can* raise
+   LM cost even though it did not here.
+3. **No `<think>` overhead applies to these runs.** The stripping code in `gemini_client.py:158`,
+   `debate.py:88` and `query_planner.py:77` exists for reasoning models such as `deepseek-r1`, but
+   `qwen2.5:7b-instruct` emits bare JSON and the recovery ladder never fires. The 1,259 median
+   completion tokens are all useful output. Do not repeat the deepseek `<think>` framing — the
+   hard-coded notes in older copies of `trace_stats.py` said so and were wrong.
 
 ---
 
@@ -458,9 +536,11 @@ Two things to disclose:
 
 | Gap | What it needs | Blocking the draft? |
 |---|---|---|
-| ~~Agent-level table (§8.2)~~ | **DONE — 30 traces, 14 Aug** | No |
-| Debate *quality* (does the promoted case beat the demoted one?) | Human adjudication of the 20 reorderings in `debate_examples.json` — ~2 h | No, but §8.2.2 must be worded as a change rate until it exists |
-| Debate-side JSON failure rate | grep server log for `advocate_failed` / `opposing_failed` / `synthesis_failed` — ~10 min | No — state the 0 % as planner-only |
+| ~~Agent-level table (§8.2)~~ | **DONE — 30 traces, 14 Aug, threshold 0.85** | No |
+| ~~Debate-side JSON failure rate~~ | **DONE — 0 failures in 240 LM calls** | No |
+| Debate *quality* (does the promoted case beat the demoted one?) | Human adjudication of the 13 reorderings in `debate_examples.json` — ~2 h | No, but §8.2.2 must be worded as a change rate until it exists |
+| Adaptive scheduler at larger n | Only 2/30 queries triggered a remedy, so the +0.18 gain rests on 2 observations. Run ~100 queries, or report n explicitly | No — but state the n |
+| `replan` / `redebate` never fired | Neither remedy was exercised in this run; their cost (+1 and +7 LM calls) is inferred, not measured | No — say "not exercised" |
 | Chunked dense channel | A CUDA box or ≥ 32 GB RAM — encoding collapsed at 24k/95,350 chunks under swap thrash | No — report as open |
 | Citation extractor precision / recall | ~2 h annotating 20 judgments (human) | No — state as a limitation |
 | Failure analysis, 30 cases | ~half a day (human); per-query deltas already in `data/eval/per_query_scores.json` | No |
@@ -497,11 +577,20 @@ $PY -m scripts.eval.score --data-dir ../data --tag _long --baseline bm25_grid
 
 # dev-split result at the final configuration (§4) — same three calls with --split dev --tag _devf
 
-# agent-level table (§8.2) — needs Postgres AND Ollama serving deepseek-r1:8b
-ollama serve &                          # model: deepseek-r1:8b
-$PY -m scripts.eval.run_agent_traces --n 30      # ~30 min: 30 × ~55 s, sequential
+# agent-level table (§8.2) — needs Postgres AND Ollama serving qwen2.5:7b-instruct
+ollama serve &                          # OLLAMA_MODEL in .env, NOT the config.py default
+$PY -m scripts.eval.run_agent_traces --n 30 --tag thresh085   # ~30 min, sequential
 $PY -m scripts.eval.trace_stats --data-dir ../data
 ```
+
+The trace runner writes an fsync'd JSONL sidecar (`data/traces/run_<tag>.jsonl`) after every query,
+so an interrupted run loses at most the query in flight; re-running the same `--tag` resumes and
+`--restart` starts over. `run_<tag>.meta.json` records the threshold, model and FAISS vector count
+the run executed under — check it before trusting a number, since the 13 Aug run's defects (§8.2.0)
+would both have been visible there.
+
+The withdrawn 13 Aug run is preserved at `data/traces/archive_thresh055_n30.json` and is the
+before-half of the scheduler ablation in §8.2.3.
 
 Per-regime significance across all metrics (§3.2) is written by the helper that produced
 `data/reports/regime_significance.json`; `score.py` bootstraps one primary metric at a time.

@@ -207,11 +207,13 @@ async def run(args: argparse.Namespace) -> None:
     rep.stat("planner_json_parse_failures", planner_failures)
     rep.stat("planner_failure_rate_pct", round(100 * planner_failures / max(complete, 1), 2))
     rep.note("Detected via the sentinel: the planner's degradation path returns exactly "
-             "confidence=0.3. Debate-side failures are not in the trace — grep the server log "
+             "confidence=0.3. Debate-side failures are not in the trace — grep the run log "
              "for advocate_failed / opposing_failed / synthesis_failed to complete this figure.")
-    rep.note("This rate is the strongest justification for switching to an instruction-tuned "
-             "model with constrained JSON output: deepseek-r1 emits <think> traces and prose "
-             "around its JSON, which is why the four-stage regex recovery ladder exists.")
+    rep.note("The model is whatever OLLAMA_MODEL resolves to (.env overrides the config "
+             "default): qwen2.5:7b-instruct for the 14 Aug run. It is instruction-tuned and "
+             "emits bare JSON, which is why this rate is 0. The four-stage regex recovery "
+             "ladder exists for reasoning models such as deepseek-r1, which wrap their JSON "
+             "in <think> traces and prose — that path is NOT exercised by these runs.")
 
     # ── Q37 ───────────────────────────────────────────────────────────────
     if token_usage:
@@ -220,16 +222,19 @@ async def run(args: argparse.Namespace) -> None:
         ct = [t.get("total_completion_tokens", 0) for t in token_usage]
         rep.stat("median_prompt_tokens", round(st.median(pt), 1))
         rep.stat("median_completion_tokens", round(st.median(ct), 1))
-        rep.note("deepseek-r1 generates <think> reasoning traces that are counted, paid for "
-                 "in latency, and then stripped and discarded — completion counts will look "
-                 "high relative to visible output. Say so.")
+        rep.note("Counts are the per-query delta against a pipeline-start snapshot of the "
+                 "process-wide client counters, so they are this query's cost, not a running "
+                 "total. With an instruction-tuned model these are all useful output; a "
+                 "reasoning model would inflate completion counts with discarded <think> text.")
     else:
         rep.note("No token_usage in any trace. Apply the two-line scheduler patch from "
                  "IMPLEMENTATION_PLAN.md Step 8, then re-run some queries.")
 
     rep.stat("api_calls_per_query", 0, "all inference is local — a genuine result")
     rep.stat("llm_invocations_per_query", "8 with debate, 1 without",
-             "1 planner + 7 debate; iterations 2-3 add none")
+             "1 planner + 7 debate (3 advocate + 3 opposing + 1 synthesis). Adaptive "
+             "re-scheduling adds LM calls only for the replan and redebate remedies; "
+             "rewiden and reweight are pure retrieval/ranking and add none.")
 
     rep.save()
 

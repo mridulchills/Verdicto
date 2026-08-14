@@ -56,6 +56,9 @@ class PrecedentWeighterAgent(BaseAgent):
         qid = input_data.get("query_id", "")
         cands = input_data.get("candidates", [])
         domain = input_data.get("legal_domain", "general")
+        # The scheduler may re-run this agent with a different signal mix when the
+        # evaluator reports that ordering, not recall, is the deficiency (MRR low).
+        weights = {**WEIGHTS, **(input_data.get("weight_overrides") or {})}
         if not cands: return {"query_id": qid, "ranked_cases": [], "reranked_count": 0}
         ids = [c["case_id"] for c in cands]
         try:
@@ -77,8 +80,8 @@ class PrecedentWeighterAgent(BaseAgent):
                 for s in scored:
                     nc = _norm(s["cite_count"], mn_c, mx_c)
                     nf = _norm(s["factual_alignment"], mn_f, mx_f)
-                    s["authority_score"] = round(min(1.0, WEIGHTS["citation_count"]*nc + WEIGHTS["bench_size"]*s["raw_bench"] + WEIGHTS["recency"]*s["raw_recency"] + WEIGHTS["factual_alignment"]*nf + WEIGHTS["domain_match"]*s["domain_score"]), 4)
+                    s["authority_score"] = round(min(1.0, weights["citation_count"]*nc + weights["bench_size"]*s["raw_bench"] + weights["recency"]*s["raw_recency"] + weights["factual_alignment"]*nf + weights["domain_match"]*s["domain_score"]), 4)
             scored.sort(key=lambda x: x.get("authority_score", 0), reverse=True)
-            return {"query_id": qid, "ranked_cases": scored[:20], "reranked_count": min(20, len(scored))}
+            return {"query_id": qid, "ranked_cases": scored[:20], "reranked_count": min(20, len(scored)), "weights_used": weights}
         except Exception as e:
             raise AgentError(f"Precedent weighting failed: {e}", query_id=qid) from e

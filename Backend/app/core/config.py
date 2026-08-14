@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     # ── Agent Configuration ───────────────────────────────────────────────
     debate_max_rounds: int = 3
     scheduler_max_iterations: int = 3
-    confidence_threshold: float = 0.55
+    confidence_threshold: float = 0.85
 
     # ── Gemini Models & Rate Limits ───────────────────────────────────────
     gemini_rate_limit_rpm: int = 60
