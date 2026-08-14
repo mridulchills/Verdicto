@@ -94,11 +94,17 @@ async def test_evaluator_basic():
         "debate_result": {"disagreement_flags": []},
     })
 
-    assert "precision_at_5" in result
-    assert "ndcg_at_10" in result
-    assert "mrr" in result
+    # The evaluator reports QPP signals, not label-free IR metrics — see
+    # tests/unit/test_agents/test_evaluator_fixes.py for why those were removed.
+    assert "signals" in result
+    assert set(result["signals"]) == {
+        "channel_agreement", "issue_coverage", "score_dispersion",
+        "top_margin", "debate_consensus",
+    }
     assert "confidence" in result
     assert 0 <= result["confidence"] <= 1
+    for name, value in result["signals"].items():
+        assert value is None or 0.0 <= value <= 1.0, f"{name} out of range: {value}"
 
 
 @pytest.mark.asyncio
@@ -114,8 +120,9 @@ async def test_evaluator_empty_results():
         "debate_result": {},
     })
 
-    assert result["precision_at_5"] == 0.0
-    assert result["mrr"] == 0.0
+    assert result["confidence"] == 0.0
+    assert result["needs_refinement"] is True
+    assert all(v is None for v in result["signals"].values())
 
 
 # ── Debate Agent Tests ──────────────────────────────────────────────────

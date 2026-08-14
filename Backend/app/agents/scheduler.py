@@ -1,8 +1,13 @@
 """
-Scheduler Agent — Orchestrates the entire multi-agent pipeline.
-Decides whether to iterate based on evaluator confidence.
-Max iterations: min(settings.scheduler_max_iterations, 3) regardless of debate flag.
-Debate is limited to iteration == 1 by the guard inside the loop.
+Scheduler Agent — orchestrates the pipeline and decides what to re-run.
+
+On a low-confidence pass it does NOT re-run everything. The evaluator's confidence is a
+weighted sum of independent signals, each owned by exactly one agent; the scheduler
+re-runs the owner of the signal with the largest headroom, plus everything downstream
+of it. See _SIGNAL_OWNER below and app/agents/evaluator.py for the decomposition.
+
+Up to min(settings.scheduler_max_iterations, 5) passes: the initial one plus at most
+one attempt at each of the four remedies.
 """
 from __future__ import annotations
 import time
@@ -14,7 +19,7 @@ from app.agents.query_planner import QueryPlannerAgent
 from app.agents.retriever import RetrieverAgent
 from app.agents.precedent_weighter import PrecedentWeighterAgent
 from app.agents.debate import DebateAgent
-from app.agents.evaluator import EvaluatorAgent
+from app.agents.evaluator import SIGNAL_WEIGHTS, EvaluatorAgent
 from app.core.config import get_settings
 from app.core.exceptions import AgentError
 
@@ -28,33 +33,18 @@ def _ms(start: float) -> int:
 
 
 # ── Adaptive re-scheduling ───────────────────────────────────────────────────
-# The evaluator's confidence is a weighted sum of four components. Each component
-# has exactly one agent that can plausibly move it, so a deficient component names
-# the agent to re-run. Re-running everything (the old behaviour) is both wasteful
-# and a no-op: the pipeline is deterministic, so an unchanged input re-derives an
-# identical output.
+# Re-running everything on a low-confidence pass is both wasteful and a no-op: the
+# pipeline is deterministic, so unchanged input re-derives identical output.
 #
-#   coverage        the retrieved cases do not speak to the query's issues
-#                   -> the QUESTION is wrong          -> re-plan
-#   precision@5     the pool is topically right but weakly scored
-#   nDCG@10         "                                 -> the POOL is wrong  -> re-retrieve
-#   MRR             a good case exists but is not at the top
-#                   -> the ORDER is wrong             -> re-weight
-#   disagreement    the advocates could not agree on the top-3
-#                   -> the ARGUMENT is unsettled      -> re-debate
-#
-# Confidence weights, from EvaluatorAgent.run:
-_CONFIDENCE_WEIGHTS = {
-    "precision_at_5": 0.3,
-    "ndcg_at_10": 0.3,
-    "mrr": 0.2,
-    "coverage": 0.2,
-}
-_AGENT_FOR_METRIC = {
-    "coverage": "replan",
-    "precision_at_5": "rewiden",
-    "ndcg_at_10": "rewiden",
-    "mrr": "reweight",
+# Each confidence signal is owned by exactly one agent, so a deficient signal names the
+# agent that can repair it. This mapping is the whole routing policy — it is not a
+# heuristic bolted on top of the evaluator, it IS the evaluator's decomposition.
+_SIGNAL_OWNER = {
+    "channel_agreement": "rewiden",    # the channels disagree -> the query is wrong for them
+    "issue_coverage": "replan",        # the issues are ungrounded -> the question is wrong
+    "score_dispersion": "reweight",    # the ranking is flat     -> the weighting is wrong
+    "top_margin": "reweight",          # no clear winner         -> the weighting is wrong
+    "debate_consensus": "redebate",    # the advocates disagreed -> re-argue it
 }
 # What each action re-runs, in pipeline order. The scheduler runs the named agent
 # and then everything downstream of it — that is the "pass its work to the next
@@ -79,28 +69,34 @@ def _diagnose(eval_result: dict[str, Any], tried: set[str],
               debate_enabled: bool) -> tuple[str | None, str]:
     """Pick the one agent most likely to raise confidence. Returns (action, reason).
 
-    Chooses by *headroom* — weight x (1 - value) — not by raw value, because a
-    0.5 coverage (weight 0.2) is worth less than a 0.6 nDCG (weight 0.3).
-    An action is only ever attempted once per query: if it did not help, the next
-    pass moves to the next-best remedy instead of repeating a known no-op.
-    """
-    if (eval_result.get("disagreement_rate", 0.0) > 0.3
-            and debate_enabled and "redebate" not in tried):
-        return "redebate", (f"debate disagreement "
-                            f"{eval_result.get('disagreement_rate', 0.0):.2f} > 0.30")
+    Chooses by *headroom* — weight x (1 - value) — not by raw value, because a weak
+    signal carrying little weight is worth less than a middling one carrying a lot.
+    Signals the evaluator could not measure are skipped: there is no evidence they are
+    deficient, so re-running their owner would be guesswork.
 
-    headroom = {
-        metric: weight * (1.0 - float(eval_result.get(metric, 0.0) or 0.0))
-        for metric, weight in _CONFIDENCE_WEIGHTS.items()
-    }
-    for metric, gap in sorted(headroom.items(), key=lambda kv: kv[1], reverse=True):
-        action = _AGENT_FOR_METRIC[metric]
+    An action is only ever attempted once per query. If a remedy did not help, the next
+    pass moves to the next-best one rather than repeating a known no-op.
+    """
+    signals = eval_result.get("signals", {}) or {}
+    headroom: dict[str, float] = {}
+    for signal, weight in SIGNAL_WEIGHTS.items():
+        value = signals.get(signal)
+        if value is None:               # not measurable this pass — no evidence either way
+            continue
+        headroom[signal] = weight * (1.0 - float(value))
+
+    for signal, gap in sorted(headroom.items(), key=lambda kv: kv[1], reverse=True):
+        action = _SIGNAL_OWNER[signal]
         if action in tried:
             continue
-        return action, (f"{metric}={float(eval_result.get(metric, 0.0) or 0.0):.3f} "
-                        f"leaves the largest confidence headroom ({gap:.3f})")
+        if action == "redebate" and not debate_enabled:
+            continue
+        if gap <= 0.0:                  # signal is already saturated; nothing to win
+            continue
+        return action, (f"{signal}={float(signals[signal]):.3f} leaves the largest "
+                        f"confidence headroom ({gap:.3f})")
 
-    return None, "every remedy has been attempted"
+    return None, "no remedy left with measurable headroom"
 
 
 class SchedulerAgent(BaseAgent):
@@ -121,9 +117,9 @@ class SchedulerAgent(BaseAgent):
         trace: dict[str, Any] = {}
         iteration = 0
 
-        # Allow up to 3 iterations for refinement regardless of debate flag.
-        # The debate guard (iteration == 1) already limits debate to the first pass.
-        max_iter = min(settings.scheduler_max_iterations, 3)
+        # Up to 5 passes: the initial one plus at most one attempt at each of the four
+        # remedies. There is no point going beyond that — every remedy is tried once.
+        max_iter = min(settings.scheduler_max_iterations, 5)
 
         # Reset circuit breaker at pipeline start so stale failures don't block agents
         from app.core.gemini_client import get_gemini_client as _get_client
@@ -362,6 +358,9 @@ class SchedulerAgent(BaseAgent):
                     "ranked_cases": ranked_cases,
                     "extracted_issues": plan_result.get("extracted_issues", []),
                     "debate_result": debate_result,
+                    # Per-channel scores survive RRF, and channel agreement is the
+                    # heaviest confidence signal — the evaluator needs the raw pool.
+                    "candidates": retrieval_result.get("candidates", []),
                 }
                 eval_result = await evaluator.execute(eval_input)
                 evaluator_ms = _ms(t0)
@@ -373,12 +372,10 @@ class SchedulerAgent(BaseAgent):
                     "input_size": len(ranked_cases),
                     "output_size": len(str(eval_result)),
                     "details": {
-                        "precision_at_5": eval_result.get("precision_at_5"),
-                        "ndcg_at_10": eval_result.get("ndcg_at_10"),
-                        "mrr": eval_result.get("mrr"),
-                        "coverage": eval_result.get("coverage"),
+                        **(eval_result.get("signals") or {}),
                         "confidence": eval_result.get("confidence"),
                         "needs_refinement": eval_result.get("needs_refinement"),
+                        "signals_missing": eval_result.get("signals_missing", []),
                     },
                 }
                 await _callback()
@@ -390,10 +387,7 @@ class SchedulerAgent(BaseAgent):
                     "reason": reason,
                     "stages_run": list(stages),
                     "confidence": confidence,
-                    "precision_at_5": eval_result.get("precision_at_5"),
-                    "ndcg_at_10": eval_result.get("ndcg_at_10"),
-                    "mrr": eval_result.get("mrr"),
-                    "coverage": eval_result.get("coverage"),
+                    "signals": eval_result.get("signals") or {},
                 })
 
                 # Keep the BEST pass, not the last one. A remedy can make things

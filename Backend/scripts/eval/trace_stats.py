@@ -150,16 +150,23 @@ async def run(args: argparse.Namespace) -> None:
         rep.section("Scheduler iterations (Q27, Q28)")
         rep.stat("mean_iterations", round(st.mean(iterations), 3))
         rep.stat("max_iterations", max(iterations))
-        rep.stat("fraction_hitting_cap", round(dist.get(3, 0) / len(iterations), 4))
+        # The cap is settings.scheduler_max_iterations, not a hard-coded 3. Reading a
+        # literal here silently reported "53% hit the cap" for a run whose cap was 5 and
+        # whose true max was 3 — the loop was stopping on exhausted headroom, not on the cap.
+        from app.core.config import get_settings as _gs
+        cap = min(_gs().scheduler_max_iterations, 5)
+        rep.stat("iteration_cap", cap)
+        rep.stat("fraction_hitting_cap",
+                 round(sum(1 for i in iterations if i >= cap) / len(iterations), 4))
         rep.table("Iteration distribution", ["iterations", "queries", "share"],
                   [[k, dist[k], f"{100*dist[k]/len(iterations):.1f}%"] for k in sorted(dist)])
         if confidences:
             rep.stat("mean_final_confidence", round(st.mean(confidences), 4))
         if dist.get(2, 0) == 0 and len(dist) > 1:
-            rep.note("BIMODAL WITH AN EMPTY MIDDLE — exactly the prediction from Q23/Q58. "
-                     "Refinement iterations are byte-identical to the first, so confidence "
-                     "cannot change between passes: a query either stops at 1 or runs to the "
-                     "cap. This is a reportable negative result about naive iteration.")
+            rep.note("BIMODAL WITH AN EMPTY MIDDLE — refinement passes are byte-identical to "
+                     "the first, so confidence cannot change between them and a query either "
+                     "stops at 1 or runs to the cap. If this fires, the adaptive scheduler is "
+                     "not varying its input and the loop is decorative.")
 
     # ── Q36 ───────────────────────────────────────────────────────────────
     if totals:
