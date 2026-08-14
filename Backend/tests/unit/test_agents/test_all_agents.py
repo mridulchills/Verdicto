@@ -98,8 +98,8 @@ async def test_evaluator_basic():
     # tests/unit/test_agents/test_evaluator_fixes.py for why those were removed.
     assert "signals" in result
     assert set(result["signals"]) == {
-        "channel_agreement", "issue_coverage", "score_dispersion",
-        "top_margin", "debate_consensus",
+        "channel_agreement", "issue_coverage", "ranking_decisiveness",
+        "debate_consensus",
     }
     assert "confidence" in result
     assert 0 <= result["confidence"] <= 1

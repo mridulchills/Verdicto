@@ -39,12 +39,14 @@ def _ms(start: float) -> int:
 # Each confidence signal is owned by exactly one agent, so a deficient signal names the
 # agent that can repair it. This mapping is the whole routing policy — it is not a
 # heuristic bolted on top of the evaluator, it IS the evaluator's decomposition.
+# Exactly one signal per remedy and one remedy per signal. An earlier version had
+# reweight owning both score_dispersion and top_margin, which it moved in opposite
+# directions — so the remedy fought itself and netted almost nothing.
 _SIGNAL_OWNER = {
-    "channel_agreement": "rewiden",    # the channels disagree -> the query is wrong for them
-    "issue_coverage": "replan",        # the issues are ungrounded -> the question is wrong
-    "score_dispersion": "reweight",    # the ranking is flat     -> the weighting is wrong
-    "top_margin": "reweight",          # no clear winner         -> the weighting is wrong
-    "debate_consensus": "redebate",    # the advocates disagreed -> re-argue it
+    "channel_agreement": "rewiden",       # channels disagree  -> the query is wrong for them
+    "issue_coverage": "replan",           # issues ungrounded  -> the question is wrong
+    "ranking_decisiveness": "reweight",   # ranking is flat    -> the weighting is wrong
+    "debate_consensus": "redebate",       # advocates disagree -> re-argue it
 }
 # What each action re-runs, in pipeline order. The scheduler runs the named agent
 # and then everything downstream of it — that is the "pass its work to the next

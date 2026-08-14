@@ -26,32 +26,46 @@ own score scale, in the clarity / NQC / WIG family. Every signal is bounded [0,1
 each one is *owned by exactly one agent*, so the scheduler's routing falls out of the
 confidence decomposition instead of being hand-wired:
 
-  channel_agreement  0.30  FAISS and ts_rank independently pick the same cases  -> retriever
-  issue_coverage     0.25  the query's issues are grounded in the results       -> planner
-  score_dispersion   0.20  the ranking discriminates rather than being flat     -> weighter
-  top_margin         0.15  there is a clear winner, not a tie                   -> weighter
-  debate_consensus   0.10  the advocates agreed                                 -> debate
+  channel_agreement     0.30  FAISS and ts_rank independently pick the same cases -> retriever
+  issue_coverage        0.25  the query's issues are grounded in the results      -> planner
+  ranking_decisiveness  0.35  the ranking separates cases rather than tying them  -> weighter
+  debate_consensus      0.10  the advocates agreed                                -> debate
+
+score_dispersion and top_margin were originally separate signals, both owned by the
+reweight remedy. They are anti-correlated under it: shifting weight onto factual
+alignment lifts the whole top-k clear of the pool (dispersion +0.324) while compressing
+the differences *within* the top-k (margin -0.334), so one remedy owned two signals it
+moved in opposite directions and netted ~+0.015. They are now a single NQC predictor.
 
 Weights sum to 1.0, so confidence spans the full [0,1] range: there is no structural
 ceiling of the kind that capped the old formula at 0.80.
 
-Calibration
------------
-QPP signals are collection-specific and none of them reaches 1.0 in practice here —
-score_dispersion tops out near 0.42, channel_agreement medians ~0.45 — so on the RAW
-scale the highest confidence any query can attain on this corpus is ~0.71. A threshold
-above that is unreachable by construction, and the scheduler would iterate to the cap
-forever without ever converging. The three retrieval-side signals are therefore min-max
-calibrated against their dev-observed p05-p95 range (fitted by
-scripts/eval/fit_confidence_threshold.py, DEV ONLY). After calibration the threshold
-means "this fraction of the quality this system actually achieves on this collection",
-which is the only reading of an absolute confidence number that survives scrutiny.
+Calibration — PERCENTILE RANK, not min-max
+------------------------------------------
+QPP signals are collection-specific and none reaches 1.0 in practice, so on the raw
+scale the best confidence attainable on this corpus is ~0.71 and any higher threshold is
+unreachable by construction. The retrieval-side signals are therefore calibrated against
+the DEV distribution by scripts/eval/fit_confidence_threshold.py.
+
+Calibration is by PERCENTILE RANK against the dev empirical CDF. The first attempt used
+min-max against dev p05-p95 and it manufactured a result: hard clipping piled mass at
+exactly 1.0 (channel_agreement hit 1.0 in 21/30 queries, dispersion in 13/30), and since
+the discarded top_margin weight was 0.15, the four remaining signals summed to exactly
+0.85 — the threshold — so 10 of 15 "converged" queries landed on precisely 0.8500 and
+every one of the 15 fell in [0.8500, 0.8599]. Convergence was an arithmetic coincidence
+between the threshold and a subset sum of the weights, not a quality judgement.
+
+Percentile rank spreads values uniformly over [0,1] with mass only at the true extremes,
+so a signal has to genuinely sit high in the dev distribution to score high. Read a
+calibrated value as "this query is at the Nth percentile of what this system achieves on
+this collection".
 
 The label-based metrics still belong in offline evaluation (scripts/eval/score.py),
 where real qrels exist. They do not belong here.
 """
 from __future__ import annotations
 
+import bisect
 import json
 import math
 import re
@@ -82,8 +96,7 @@ _STOPWORDS = {
 SIGNAL_WEIGHTS: dict[str, float] = {
     "channel_agreement": 0.30,
     "issue_coverage": 0.25,
-    "score_dispersion": 0.20,
-    "top_margin": 0.15,
+    "ranking_decisiveness": 0.35,
     "debate_consensus": 0.10,
 }
 
@@ -92,18 +105,15 @@ _TOP_K = 10
 # Signals whose raw range is collection-specific and does not reach 1.0 in practice.
 # Calibrated against the dev distribution by scripts/eval/fit_confidence_threshold.py.
 # issue_coverage and debate_consensus are excluded: they are true proportions already.
-_CALIBRATED_SIGNALS = ("channel_agreement", "score_dispersion", "top_margin")
+_CALIBRATED_SIGNALS = ("channel_agreement", "ranking_decisiveness")
 _CALIBRATION_FILE = "qpp_calibration.json"
 
 
-def _load_calibration() -> dict[str, dict[str, float]]:
-    """Load the dev-fitted min-max ranges, if present.
+def _load_calibration() -> dict[str, list[float]]:
+    """Load the dev-fitted quantile grids, if present.
 
-    Without calibration, confidence cannot approach 1.0 on this collection —
-    score_dispersion tops out near 0.42 and channel_agreement medians ~0.45 — so any
-    threshold above ~0.71 would be unreachable by construction and the scheduler would
-    iterate to the cap on every query forever. Absent the file the raw signals are used
-    unchanged, which is safe but means the threshold must be set much lower.
+    Absent the file the raw signals are used unchanged, which is safe but means the
+    threshold must be set far lower — the raw ceiling on this collection is ~0.71.
     """
     for base in (Path("../data"), Path("data"), Path(__file__).resolve().parents[3] / "data"):
         path = base / "eval" / _CALIBRATION_FILE
@@ -111,8 +121,10 @@ def _load_calibration() -> dict[str, dict[str, float]]:
             if path.exists():
                 blob = json.loads(path.read_text(encoding="utf-8"))
                 logger.info("evaluator.calibration_loaded", path=str(path),
-                            fitted_on=blob.get("fitted_on"), n=blob.get("n"))
-                return blob.get("signals", {})
+                            fitted_on=blob.get("fitted_on"), n=blob.get("n"),
+                            method=blob.get("method"))
+                return {k: v["quantiles"] for k, v in blob.get("signals", {}).items()
+                        if isinstance(v, dict) and v.get("quantiles")}
         except Exception as exc:                                    # noqa: BLE001
             logger.warning("evaluator.calibration_unreadable", path=str(path), error=str(exc))
     logger.warning("evaluator.calibration_missing", file=_CALIBRATION_FILE)
@@ -123,14 +135,25 @@ _CALIBRATION = _load_calibration()
 
 
 def _calibrate(signal: str, value: float | None) -> float | None:
-    """Map a raw signal onto [0,1] using its dev-observed p05-p95 range."""
+    """Percentile rank of `value` within the dev distribution, linearly interpolated.
+
+    Returns the fraction of the dev sample this query beats. Only a value at or beyond
+    the dev extremes reaches exactly 0.0 or 1.0, so calibrated signals do not pile up at
+    the boundary the way min-max clipping made them.
+    """
     if value is None or signal not in _CALIBRATION:
         return value
-    lo = _CALIBRATION[signal].get("lo", 0.0)
-    hi = _CALIBRATION[signal].get("hi", 1.0)
-    if hi <= lo:
+    grid = _CALIBRATION[signal]
+    if len(grid) < 2:
         return value
-    return max(0.0, min(1.0, (value - lo) / (hi - lo)))
+    if value <= grid[0]:
+        return 0.0
+    if value >= grid[-1]:
+        return 1.0
+    i = bisect.bisect_left(grid, value)
+    lo, hi = grid[i - 1], grid[i]
+    frac = 0.0 if hi == lo else (value - lo) / (hi - lo)
+    return max(0.0, min(1.0, (i - 1 + frac) / (len(grid) - 1)))
 
 
 def _tokens(text: str) -> set[str]:
@@ -165,46 +188,33 @@ def _channel_agreement(candidates: list[dict[str, Any]],
     return sum(1 for cid in shown if cid in faiss and cid in bm25) / len(shown)
 
 
-def _score_dispersion(scores: list[float], pool_scores: list[float]) -> float | None:
-    """How far the shown top-k stands out from the whole candidate pool (WIG-style).
+def _ranking_decisiveness(scores: list[float], pool_scores: list[float]) -> float | None:
+    """NQC: how sharply the ranking separates cases, relative to the pool it drew from.
 
-    A ranking that scores its top-k barely above the pool average has not discriminated.
-    Normalised by the pool's own headroom so it stays in [0,1] with no calibration
-    constant, and so it is invariant to any affine rescaling of the score column:
+        std(top-k) / mean(pool)
 
-        (mean(top-k) - mean(pool)) / (max(pool) - mean(pool))
+    Normalized Query Commitment (Shtok et al.) is the standard post-retrieval predictor
+    for exactly this question. A ranking that assigns near-identical scores has committed
+    to nothing; one with real spread has discriminated. Dividing by the pool mean makes it
+    invariant to any rescaling of the score column, so the ranker cannot inflate it by
+    emitting larger numbers.
 
-    Note the earlier attempt here — normalised entropy of the top-k scores — is
-    mathematically clean but useless in practice: authority scores live in a narrow band
-    (~0.45-0.62), so the distribution is near-uniform and the measure pinned at ~0.005
-    for every query regardless of ranking quality.
+    This replaces the earlier pair of signals — score_dispersion (top-k standout from the
+    pool) and top_margin (rank-1 separation from the median) — which were both owned by
+    the reweight remedy and which reweight moved in OPPOSITE directions: +0.324 and
+    -0.334 respectively across 29 queries, netting ~+0.015. A single measure that captures
+    within-top-k spread cannot be gamed by trading one half against the other.
     """
     top = [s for s in scores[:_TOP_K] if s > 0]
     pool = [s for s in pool_scores if s > 0]
     if len(top) < 2 or len(pool) < 2:
         return None
     pool_mean = sum(pool) / len(pool)
-    headroom = max(pool) - pool_mean
-    if headroom <= 0:
+    if pool_mean <= 0:
         return None
-    top_mean = sum(top) / len(top)
-    return max(0.0, min(1.0, (top_mean - pool_mean) / headroom))
-
-
-def _top_margin(scores: list[float]) -> float | None:
-    """Relative gap between the best case and the median of the top-k.
-
-    Expressed as a fraction of the top score so it needs no calibration constant and
-    stays in [0,1]. A decisive result set has one case standing clear of the pack.
-    """
-    vals = sorted((s for s in scores[:_TOP_K] if s > 0), reverse=True)
-    if len(vals) < 2:
-        return None
-    top = vals[0]
-    if top <= 0:
-        return None
-    mid = vals[len(vals) // 2]
-    return max(0.0, min(1.0, (top - mid) / top))
+    mean_top = sum(top) / len(top)
+    variance = sum((x - mean_top) ** 2 for x in top) / len(top)
+    return math.sqrt(variance) / pool_mean
 
 
 def _issue_coverage(query_issues: list[str],
@@ -267,8 +277,8 @@ class EvaluatorAgent(BaseAgent):
         raw_signals: dict[str, float | None] = {
             "channel_agreement": _channel_agreement(candidates, ranked_cases),
             "issue_coverage": _issue_coverage(query_issues, ranked_cases),
-            "score_dispersion": _score_dispersion(scores, ranked_pool or pool_scores),
-            "top_margin": _top_margin(scores),
+            "ranking_decisiveness": _ranking_decisiveness(
+                scores, ranked_pool or pool_scores),
             "debate_consensus": _debate_consensus(debate_result, ranked_cases),
         }
         signals: dict[str, float | None] = {

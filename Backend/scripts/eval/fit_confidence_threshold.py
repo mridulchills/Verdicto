@@ -149,17 +149,20 @@ async def run(args: argparse.Namespace) -> None:
     # already true proportions on a natural [0,1] scale and stretching them would be
     # meaningless.
     calibration = {}
-    for key in ("channel_agreement", "score_dispersion", "top_margin"):
+    for key in ("channel_agreement", "ranking_decisiveness"):
         vals = sorted(r["signals"][key] for r in rows if r["signals"][key] is not None)
         if len(vals) >= 10:
-            calibration[key] = {
-                "lo": round(vals[int(0.05 * (len(vals) - 1))], 4),
-                "hi": round(vals[int(0.95 * (len(vals) - 1))], 4),
-            }
+            # 21-point quantile grid; the evaluator interpolates a percentile rank.
+            grid = [round(vals[min(len(vals) - 1, int(round(q / 100 * (len(vals) - 1))))], 6)
+                    for q in range(0, 101, 5)]
+            calibration[key] = {"quantiles": grid,
+                                "min": round(vals[0], 4), "max": round(vals[-1], 4)}
     cal_path = data / "eval" / "qpp_calibration.json"
     cal_path.write_text(json.dumps({
         "fitted_on": "dev", "n": len(rows), "queries": out_path.name,
-        "note": "min-max range per signal; evaluator clips to [0,1]",
+        "method": "percentile-rank against the dev empirical CDF",
+        "note": "min-max clipping was abandoned: it piled mass at exactly 1.0 and made "
+                "convergence an arithmetic coincidence with a subset sum of the weights",
         "signals": calibration,
     }, indent=1), encoding="utf-8")
     print(f"[info] calibration -> {cal_path}")
@@ -168,11 +171,21 @@ async def run(args: argparse.Namespace) -> None:
         s = dict(signals)
         s["issue_coverage"] = 1.0
         s["debate_consensus"] = 1.0
+        import bisect as _bi
         for key, c in calibration.items():
             if s.get(key) is None:
                 continue
-            span = c["hi"] - c["lo"]
-            s[key] = max(0.0, min(1.0, (s[key] - c["lo"]) / span)) if span > 0 else 0.5
+            grid = c["quantiles"]
+            v = s[key]
+            if v <= grid[0]:
+                s[key] = 0.0
+            elif v >= grid[-1]:
+                s[key] = 1.0
+            else:
+                i = _bi.bisect_left(grid, v)
+                lo_, hi_ = grid[i - 1], grid[i]
+                frac = 0.0 if hi_ == lo_ else (v - lo_) / (hi_ - lo_)
+                s[key] = (i - 1 + frac) / (len(grid) - 1)
         av = {k: v for k, v in s.items() if v is not None}
         tw = sum(SIGNAL_WEIGHTS[k] for k in av)
         return sum(SIGNAL_WEIGHTS[k] * v for k, v in av.items()) / tw if tw else 0.0
@@ -191,7 +204,7 @@ async def run(args: argparse.Namespace) -> None:
 
     rep.section("Signal distribution on dev (retrieval side)")
     dist_rows = []
-    for key in ("channel_agreement", "score_dispersion", "top_margin"):
+    for key in ("channel_agreement", "ranking_decisiveness"):
         vals = sorted(r["signals"][key] for r in rows if r["signals"][key] is not None)
         if vals:
             dist_rows.append([key, SIGNAL_WEIGHTS[key], round(vals[0], 3),
@@ -227,6 +240,16 @@ async def run(args: argparse.Namespace) -> None:
     rep.note("Pick a threshold where a substantial minority iterates: too low and the "
              "scheduler never engages, too high and nothing ever converges and the loop "
              "is indistinguishable from a fixed iteration count.")
+    subset_sums = set()
+    weights = list(SIGNAL_WEIGHTS.values())
+    for mask in range(1, 1 << len(weights)):
+        subset_sums.add(round(sum(w for i, w in enumerate(weights) if mask >> i & 1), 4))
+    rep.stat("weight_subset_sums", ", ".join(f"{v:.2f}" for v in sorted(subset_sums)))
+    rep.note("DO NOT set the threshold at any of those subset sums. When a threshold "
+             "coincides with one, a query whose other signals all saturate lands on it "
+             "EXACTLY and counts as converged for arithmetic reasons. That is what "
+             "happened at 0.85 = 0.30 + 0.25 + 0.20 + 0.10 in the first calibrated run: "
+             "10 of 15 convergences sat on precisely 0.8500.")
     rep.save()
 
     print(f"\nprojected confidence: median={st.median(proj):.3f} "

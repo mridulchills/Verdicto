@@ -9,9 +9,9 @@ what made the old confidence circular and saturated (nDCG was identically 1.0 be
 the list was pre-sorted; MRR was 1.0 in 33/33 traced queries).
 
 Under the QPP design confidence is a function of evidence the ranker does not control —
-channel agreement, issue coverage, dispersion against the pool, margin, debate consensus
-— so a set of cases with perfect scores but no corroboration SHOULD score low. The tests
-below assert the properties that actually hold.
+channel agreement, issue coverage, ranking decisiveness (NQC), debate consensus — so a
+set of cases with perfect scores but no corroboration SHOULD score low. The tests below
+assert the properties that actually hold.
 
 **Validates: Requirements 5.1, 5.2, 5.3, 5.5, 5.6**
 """
@@ -49,10 +49,11 @@ def _cases(n: int, *, final: float | None = None, authority: float = 0.0,
 def test_evaluator_prefers_final_score_over_authority_score() -> None:
     """final_score drives the score-shaped signals; authority_score is the fallback.
 
-    Asserted through top_margin, which is computed from the score column: a spread of
-    final_scores must produce a non-zero margin even when every authority_score is flat.
-    Under the old suite this was asserted via precision_at_5, a metric that no longer
-    exists because it required a relevance threshold the system cannot know.
+    Asserted through ranking_decisiveness, which is computed from the score column: a
+    spread of final_scores must produce non-zero decisiveness even when every
+    authority_score is flat. Under the old suite this was asserted via precision_at_5, a
+    metric that no longer exists because it required a relevance threshold the system
+    cannot know.
 
     **Validates: Requirements 5.1, 5.2, 5.3**
     """
@@ -62,9 +63,9 @@ def test_evaluator_prefers_final_score_over_authority_score() -> None:
     ]
     result = _run({"query_id": "t", "ranked_cases": spread_final,
                    "extracted_issues": [], "debate_result": {}, "candidates": []})
-    assert result["signals"]["top_margin"] is not None
-    assert result["signals"]["top_margin"] > 0, (
-        "top_margin must be > 0 when final_scores are spread; a flat value indicates "
+    assert result["signals"]["ranking_decisiveness"] is not None
+    assert result["signals"]["ranking_decisiveness"] > 0, (
+        "ranking_decisiveness must be > 0 when final_scores are spread; zero indicates "
         "authority_score (constant 0.5 here) is being read instead of final_score"
     )
 
@@ -79,9 +80,10 @@ def test_evaluator_falls_back_to_authority_score() -> None:
     ]
     result = _run({"query_id": "t", "ranked_cases": spread_authority,
                    "extracted_issues": [], "debate_result": {}, "candidates": []})
-    assert result["signals"]["top_margin"] is not None
-    assert result["signals"]["top_margin"] > 0, (
-        "top_margin must be > 0 when authority_scores are spread and final_score is absent"
+    assert result["signals"]["ranking_decisiveness"] is not None
+    assert result["signals"]["ranking_decisiveness"] > 0, (
+        "ranking_decisiveness must be > 0 when authority_scores are spread and "
+        "final_score is absent"
     )
 
 
